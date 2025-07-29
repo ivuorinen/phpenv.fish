@@ -1,0 +1,85 @@
+# Fisher package definition for phpenv.fish
+# This file enables installation via: fisher install ivuorinen/phpenv.fish
+
+function __phpenv_install --on-event phpenv_install
+    echo "Installing phpenv.fish..."
+
+    # Check for required dependencies
+    if not command -q jq
+        echo "Installing jq dependency..."
+        if command -q brew
+            brew install jq
+        else
+            echo "Error: Homebrew is required to install jq dependency" >&2
+            echo "Install Homebrew first: https://brew.sh" >&2
+            return 1
+        end
+    end
+
+    # Add required Homebrew taps
+    if command -q brew; and functions -q __phpenv_ensure_taps
+        echo "Adding Homebrew taps..."
+        __phpenv_ensure_taps
+    end
+
+    # Set default configuration if not already set (use session variables)
+    if not set -q PHPENV_AUTO_INSTALL
+        set -g PHPENV_AUTO_INSTALL false
+        echo "Set PHPENV_AUTO_INSTALL=false (change with: phpenv config set auto-install true)"
+    end
+
+    if not set -q PHPENV_AUTO_INSTALL_EXTENSIONS
+        set -g PHPENV_AUTO_INSTALL_EXTENSIONS false
+        echo "Set PHPENV_AUTO_INSTALL_EXTENSIONS=false"
+    end
+
+    if not set -q PHPENV_AUTO_SWITCH
+        set -g PHPENV_AUTO_SWITCH true
+        echo "Set PHPENV_AUTO_SWITCH=true (automatic version switching enabled)"
+    end
+
+    if not set -q PHPENV_DEFAULT_EXTENSIONS
+        set -g PHPENV_DEFAULT_EXTENSIONS "opcache"
+        echo "Set default extensions: opcache"
+    end
+
+    echo "phpenv.fish installed successfully!"
+    echo ""
+    echo "Quick start:"
+    echo "  phpenv versions        # Show available versions"
+    echo "  phpenv install 8.3     # Install PHP 8.3"
+    echo "  phpenv global 8.3      # Set as global default"
+    echo "  phpenv help            # Show all commands"
+    echo ""
+    echo "Run 'phpenv doctor' to check your installation."
+end
+
+function __phpenv_update --on-event phpenv_update
+    echo "Updating phpenv.fish..."
+    __phpenv_install
+end
+
+function __phpenv_uninstall --on-event phpenv_uninstall
+    echo "Uninstalling phpenv.fish..."
+
+    # Remove all phpenv variables (both session and universal)
+    set -e PHPENV_AUTO_INSTALL
+    set -e PHPENV_AUTO_INSTALL_EXTENSIONS
+    set -e PHPENV_AUTO_SWITCH
+    set -e PHPENV_DEFAULT_EXTENSIONS
+    set -e PHPENV_GLOBAL_VERSION
+    set -e PHPENV_ORIGINAL_PATH
+    set -e PHPENV_CURRENT_VERSION
+    set -e PHPENV_CURRENT_PATH
+    set -e PHPENV_LAST_SWITCH_TIME
+    set -e PHPENV_VERSION_OVERRIDE
+    set -e PHPENV_INITIALIZED
+    # Remove cache variables
+    set -e __phpenv_version_cache
+    set -e __phpenv_version_cache_time
+    set -e __phpenv_cellar_cache
+
+    echo "phpenv.fish configuration removed."
+    echo "Note: Installed PHP versions are preserved."
+end
+
