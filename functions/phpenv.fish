@@ -236,12 +236,15 @@ function __phpenv_ensure_taps
         return 1
     end
 
-    # Add taps if not already added
-    if not brew tap | grep -q shivammathur/php 2>/dev/null
-        brew tap shivammathur/php 2>/dev/null
-    end
-    if not brew tap | grep -q shivammathur/extensions 2>/dev/null
-        brew tap shivammathur/extensions 2>/dev/null
+    # Check and add required taps only if missing
+    set -l required_taps "shivammathur/php" "shivammathur/extensions"
+    for tap in $required_taps
+        if not brew tap | grep -q $tap 2>/dev/null
+            if not brew tap $tap 2>/dev/null
+                echo "Warning: Failed to add tap $tap" >&2
+                return 1
+            end
+        end
     end
 end
 
@@ -569,8 +572,7 @@ function __phpenv_get_tap_versions
         return
     end
 
-    set -l phpenv_formulas (brew tap-info shivammathur/php --json 2>/dev/null | \
-        jq -r '.[]|(.formula_names[]?)' 2>/dev/null)
+    set -l phpenv_formulas (__phpenv_get_tap_formulas "shivammathur/php")
 
     if test -z "$phpenv_formulas"
         return
@@ -672,39 +674,30 @@ function __phpenv_config -a phpenv_action phpenv_key phpenv_value
     end
 end
 
+# Helper function to get environment variable value
+function __phpenv_get_env_var -a key
+    switch $key
+        case global-version
+            echo $PHPENV_GLOBAL_VERSION
+        case auto-install
+            echo $PHPENV_AUTO_INSTALL
+        case auto-install-extensions
+            echo $PHPENV_AUTO_INSTALL_EXTENSIONS
+        case auto-switch
+            echo $PHPENV_AUTO_SWITCH
+        case default-extensions
+            echo $PHPENV_DEFAULT_EXTENSIONS
+    end
+end
+
 function __phpenv_config_get -a phpenv_key
-    set -l phpenv_value
+    set -l phpenv_value (__phpenv_get_env_var $phpenv_key)
     set -l phpenv_source
 
-    switch $phpenv_key
-        case global-version
-            if test -n "$PHPENV_GLOBAL_VERSION"
-                set phpenv_value $PHPENV_GLOBAL_VERSION
-                set phpenv_source "fish universal variable"
-            end
-        case auto-install
-            if test -n "$PHPENV_AUTO_INSTALL"
-                set phpenv_value $PHPENV_AUTO_INSTALL
-                set phpenv_source "fish universal variable"
-            end
-        case auto-install-extensions
-            if test -n "$PHPENV_AUTO_INSTALL_EXTENSIONS"
-                set phpenv_value $PHPENV_AUTO_INSTALL_EXTENSIONS
-                set phpenv_source "fish universal variable"
-            end
-        case auto-switch
-            if test -n "$PHPENV_AUTO_SWITCH"
-                set phpenv_value $PHPENV_AUTO_SWITCH
-                set phpenv_source "fish universal variable"
-            end
-        case default-extensions
-            if test -n "$PHPENV_DEFAULT_EXTENSIONS"
-                set phpenv_value $PHPENV_DEFAULT_EXTENSIONS
-                set phpenv_source "fish universal variable"
-            end
-    end
-
-    if test -z "$phpenv_value"
+    if test -n "$phpenv_value"
+        set phpenv_source "fish universal variable"
+    else
+        # Check config files if no env var set
         for phpenv_config_file in ~/.config/fish/conf.d/phpenv.fish ~/.config/phpenv/config ~/.phpenv.fish
             if test -f $phpenv_config_file
                 set -l phpenv_file_value (grep "^$phpenv_key=" $phpenv_config_file | cut -d= -f2- | head -1)
@@ -867,13 +860,18 @@ function __phpenv_extensions_uninstall -a phpenv_extension
     end
 end
 
-function __phpenv_get_available_extensions
+# Unified helper for getting tap formulas
+function __phpenv_get_tap_formulas -a tap_name
     if not command -q brew
         return 1
     end
 
-    brew tap-info shivammathur/extensions --json 2>/dev/null | \
+    brew tap-info $tap_name --json 2>/dev/null | \
         jq -r '.[]|(.formula_names[]?)' 2>/dev/null
+end
+
+function __phpenv_get_available_extensions
+    __phpenv_get_tap_formulas "shivammathur/extensions"
 end
 
 function __phpenv_extension_available -a phpenv_extension phpenv_version
