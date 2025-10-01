@@ -25,6 +25,7 @@ fisher install ivuorinen/phpenv.fish
 ### Manual Installation
 
 1. Copy files to your fish configuration:
+
    ```bash
    # Functions
    curl -L https://raw.githubusercontent.com/ivuorinen/phpenv.fish/main/functions/phpenv.fish > ~/.config/fish/functions/phpenv.fish
@@ -37,11 +38,13 @@ fisher install ivuorinen/phpenv.fish
    ```
 
 2. Install dependencies:
+
    ```bash
    brew install jq
    ```
 
 3. Add Homebrew taps:
+
    ```bash
    brew tap shivammathur/php
    brew tap shivammathur/extensions
@@ -120,12 +123,14 @@ phpenv automatically detects PHP versions from multiple sources (in priority ord
 ### Composer.json Support
 
 Supports all semver constraints:
+
 - `^8.1` → Uses PHP 8.3 (latest 8.x)
 - `~8.2.0` → Uses PHP 8.2
 - `>=8.0` → Uses PHP 8.3
 - `8.1.*` → Uses PHP 8.1
 
 Checks both locations:
+
 ```json
 {
   "require": {
@@ -178,6 +183,7 @@ phpenv config set auto-install-extensions true
 Uses [shivammathur/homebrew-php](https://github.com/shivammathur/homebrew-php) with dynamic version detection:
 
 **Version Aliases:**
+
 - `latest` - Latest stable PHP version
 - `nightly` - Development version
 - `8.x` - Latest PHP 8.x version
@@ -321,4 +327,3 @@ MIT License - see LICENSE file for details.
 - [shivammathur/homebrew-php](https://github.com/shivammathur/homebrew-php)
 - [shivammathur/homebrew-extensions](https://github.com/shivammathur/homebrew-extensions)
 - [jorgebucaran/fisher](https://github.com/jorgebucaran/fisher)
-

@@ -24,12 +24,14 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
 ### Installation for Development
 
 1. Fork and clone the repository:
+
    ```bash
    git clone https://github.com/YOUR-USERNAME/phpenv.fish.git
    cd phpenv.fish
    ```
 
 2. Link the development version to your Fish config:
+
    ```bash
    # Create backup of existing installation if any
    mv ~/.config/fish/functions/phpenv.fish ~/.config/fish/functions/phpenv.fish.backup 2>/dev/null || true
@@ -41,6 +43,7 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
    ```
 
 3. Install dependencies:
+
    ```bash
    brew install jq
    brew tap shivammathur/php
@@ -48,6 +51,7 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
    ```
 
 4. Set up pre-commit hooks:
+
    ```bash
    pip install pre-commit
    pre-commit install
@@ -115,6 +119,7 @@ phpenv list
 4. Update help text in `__phpenv_help`
 
 Example:
+
 ```fish
 # In main phpenv function
 case mynewcommand
@@ -168,6 +173,7 @@ phpenv which php
 ### Edge Cases
 
 Test edge cases:
+
 - Missing jq dependency
 - Network connectivity issues
 - Invalid version files
@@ -186,6 +192,7 @@ The repository uses several pre-commit hooks for code quality:
 - **General**: File format validation, trailing whitespace removal
 
 Run hooks manually:
+
 ```bash
 pre-commit run --all-files
 ```
@@ -244,6 +251,7 @@ Use unified helper functions to avoid code duplication:
 ### Pull Request Process
 
 1. **Create a branch** from `main`:
+
    ```bash
    git checkout -b feature/my-improvement
    ```
@@ -254,6 +262,7 @@ Use unified helper functions to avoid code duplication:
    - Add tests if applicable
 
 3. **Run quality checks**:
+
    ```bash
    pre-commit run --all-files
    shellcheck functions/phpenv.fish
@@ -265,6 +274,7 @@ Use unified helper functions to avoid code duplication:
    - Test on different environments if possible
 
 5. **Commit with clear messages**:
+
    ```bash
    git commit -m "feat: add new command for X functionality"
    ```
@@ -277,6 +287,7 @@ Use unified helper functions to avoid code duplication:
 ### Commit Message Format
 
 Follow conventional commits:
+
 - `feat:` for new features
 - `fix:` for bug fixes
 - `docs:` for documentation changes
@@ -287,6 +298,7 @@ Follow conventional commits:
 ### Code Review
 
 All changes require code review. The maintainer will:
+
 - Review for code quality and style
 - Test functionality
 - Check performance impact
