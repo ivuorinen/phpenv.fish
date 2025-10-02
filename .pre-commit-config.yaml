@@ -46,6 +46,13 @@ repos:
       - id: markdownlint
         args: [-c, .markdownlint.json, --fix]
 
+  # EditorConfig linting
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: 3.0.3
+    hooks:
+      - id: editorconfig-checker
+        alias: ec
+
   # YAML linting
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.37.1
