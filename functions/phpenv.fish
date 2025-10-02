@@ -690,14 +690,35 @@ function __phpenv_get_env_var -a key
     end
 end
 
+# Helper function to map config key to env var name
+function __phpenv_env_var_name -a key
+    switch $key
+        case global-version
+            echo PHPENV_GLOBAL_VERSION
+        case auto-install
+            echo PHPENV_AUTO_INSTALL
+        case auto-install-extensions
+            echo PHPENV_AUTO_INSTALL_EXTENSIONS
+        case auto-switch
+            echo PHPENV_AUTO_SWITCH
+        case default-extensions
+            echo PHPENV_DEFAULT_EXTENSIONS
+        case '*'
+            echo ""
+    end
+end
+
 function __phpenv_config_get -a phpenv_key
-    set -l phpenv_value (__phpenv_get_env_var $phpenv_key)
+    set -l phpenv_env_var (__phpenv_env_var_name $phpenv_key)
+    set -l phpenv_value
     set -l phpenv_source
 
-    if test -n "$phpenv_value"
+    # Check if environment variable is set
+    if test -n "$phpenv_env_var" -a (set -q $phpenv_env_var)
+        set phpenv_value (eval echo \$$phpenv_env_var)
         set phpenv_source "fish universal variable"
     else
-        # Check config files if no env var set
+        # Check config files if environment variable is unset
         for phpenv_config_file in ~/.config/fish/conf.d/phpenv.fish ~/.config/phpenv/config ~/.phpenv.fish
             if test -f $phpenv_config_file
                 set -l phpenv_file_value (grep "^$phpenv_key=" $phpenv_config_file | cut -d= -f2- | head -1)
