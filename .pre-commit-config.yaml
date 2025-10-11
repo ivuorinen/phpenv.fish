@@ -82,13 +82,13 @@ repos:
 
   # Renovate config validation
   - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 41.131.9
+    rev: 41.132.5
     hooks:
       - id: renovate-config-validator
 
   # Security scanning
   - repo: https://github.com/bridgecrewio/checkov.git
-    rev: '3.2.472'
+    rev: '3.2.479'
     hooks:
       - id: checkov
         args:
