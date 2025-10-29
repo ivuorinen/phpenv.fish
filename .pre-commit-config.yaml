@@ -88,7 +88,7 @@ repos:
 
   # Security scanning
   - repo: https://github.com/bridgecrewio/checkov.git
-    rev: '3.2.487'
+    rev: '3.2.488'
     hooks:
       - id: checkov
         args:
