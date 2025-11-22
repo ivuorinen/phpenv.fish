@@ -224,6 +224,8 @@ function __phpenv_get_cellar_path
         set -g __phpenv_cellar_cache /opt/homebrew/Cellar
     else if test -d /usr/local/Cellar
         set -g __phpenv_cellar_cache /usr/local/Cellar
+    else if test -d /home/linuxbrew/.linuxbrew/Cellar
+        set -g __phpenv_cellar_cache /home/linuxbrew/.linuxbrew/Cellar
     else
         set -g __phpenv_cellar_cache ""
     end
@@ -714,7 +716,7 @@ function __phpenv_config_get -a phpenv_key
     set -l phpenv_source
 
     # Check if environment variable is set
-    if test -n "$phpenv_env_var" -a (set -q $phpenv_env_var)
+    if test -n "$phpenv_env_var"; and set -q $phpenv_env_var
         set phpenv_value (eval echo \$$phpenv_env_var)
         set phpenv_source "fish universal variable"
     else
