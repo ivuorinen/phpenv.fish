@@ -14,4 +14,3 @@ max_line_length = 120
 # Markdown files
 [*.md]
 max_line_length = 200
-

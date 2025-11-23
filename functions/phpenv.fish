@@ -1096,4 +1096,3 @@ function __phpenv_validate_extensions -a phpenv_extensions_string
         return 1
     end
 end
-

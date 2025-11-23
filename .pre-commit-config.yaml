@@ -4,26 +4,20 @@ repos:
     rev: v6.0.0
     hooks:
       - id: check-added-large-files
-      - id: check-ast
-      - id: check-builtin-literals
       - id: check-case-conflict
       - id: check-executables-have-shebangs
       - id: check-json
       - id: check-merge-conflict
       - id: check-shebang-scripts-are-executable
       - id: check-symlinks
-      - id: check-toml
-      - id: check-xml
       - id: check-yaml
         args: [--allow-multiple-documents]
-      - id: debug-statements
       - id: detect-private-key
       - id: end-of-file-fixer
       - id: mixed-line-ending
         args: [--fix=auto]
       - id: pretty-format-json
         args: [--autofix, --no-sort-keys]
-      - id: requirements-txt-fixer
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
 
@@ -32,7 +26,7 @@ repos:
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        args: ['--baseline', '.secrets.baseline']
+        args: ["--baseline", ".secrets.baseline"]
 
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
@@ -64,27 +58,21 @@ repos:
     rev: v3.12.0-2
     hooks:
       - id: shfmt
-        args: [-w, -s, -i, '2']
+        args: [-w, -s, -i, "2"]
 
   # Shell linting
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.11.0
     hooks:
       - id: shellcheck
-        args: ['--severity=warning']
+        args: ["--severity=warning"]
 
   # GitHub Actions linting
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.9
     hooks:
       - id: actionlint
-        args: ['-shellcheck=']
-
-  # Renovate config validation
-  - repo: https://github.com/renovatebot/pre-commit-hooks
-    rev: 42.21.3
-    hooks:
-      - id: renovate-config-validator
+        args: ["-shellcheck="]
 
   # Security scanning
   - repo: https://github.com/bridgecrewio/checkov.git
@@ -92,6 +80,6 @@ repos:
     hooks:
       - id: checkov
         args:
-          - '--quiet'
-          - '--framework'
-          - 'github_actions,yaml'
+          - "--quiet"
+          - "--framework"
+          - "github_actions,yaml"

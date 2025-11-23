@@ -82,4 +82,3 @@ function __phpenv_uninstall --on-event phpenv_uninstall
     echo "phpenv.fish configuration removed."
     echo "Note: Installed PHP versions are preserved."
 end
-
