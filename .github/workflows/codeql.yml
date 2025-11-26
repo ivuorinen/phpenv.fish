@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: ['javascript'] # Add languages used in your actions
+        language: ['actions'] # Add languages used in your actions
 
     steps:
       - name: Checkout repository
