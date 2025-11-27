@@ -35,7 +35,7 @@ repos:
         args: ['--baseline', '.secrets.baseline']
 
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.29.1
+    rev: v8.30.0
     hooks:
       - id: gitleaks
 
