@@ -703,7 +703,21 @@ function __phpenv_provider_apt_uninstall -a phpenv_version
         return 1
     end
 
-    if sudo apt-get remove -y $packages
+    # Validate package names follow Debian naming rules before using in sudo command
+    set -l validated_packages
+    for pkg in $packages
+        # Debian package names: lowercase alphanumeric, plus, minus, period; min 2 chars
+        if string match -rq '^[a-z0-9][a-z0-9.+-]+$' $pkg
+            set -a validated_packages $pkg
+        end
+    end
+
+    if test (count $validated_packages) -eq 0
+        echo "No valid packages found for PHP $phpenv_version"
+        return 1
+    end
+
+    if sudo apt-get remove -y $validated_packages
         echo "PHP $phpenv_version uninstalled successfully"
 
         # Clean up shim directory if this version was active
