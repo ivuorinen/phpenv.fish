@@ -179,8 +179,11 @@ function __phpenv_parse_semver_constraint -a phpenv_constraint
         case '5.*' '5.x.*'
             echo "5.6"
         case '*'
-            if echo $phpenv_constraint | grep -q '[0-9]\+\.[0-9]\+'
-                echo $phpenv_constraint | sed 's/[^0-9\.]//g' | cut -d. -f1,2
+            # Extract first major.minor match using proper string matching
+            # This handles complex constraints like ">=8.1 <9.0" correctly
+            set -l version_match (string match -r '[0-9]+\.[0-9]+' $phpenv_constraint)
+            if test -n "$version_match"
+                echo $version_match[1]
             else
                 echo $phpenv_latest
             end
@@ -250,8 +253,12 @@ end
 function __phpenv_get_provider
     # Check for user override
     if set -q PHPENV_PROVIDER; and test -n "$PHPENV_PROVIDER"
-        echo $PHPENV_PROVIDER
-        return 0
+        if contains $PHPENV_PROVIDER homebrew apt
+            echo $PHPENV_PROVIDER
+            return 0
+        else
+            echo "Warning: Invalid PHPENV_PROVIDER '$PHPENV_PROVIDER', using auto-detect" >&2
+        end
     end
 
     # macOS always uses Homebrew
@@ -314,7 +321,7 @@ function __phpenv_provider_homebrew_ensure_source
     # Check and add required taps only if missing
     set -l required_taps "shivammathur/php" "shivammathur/extensions"
     for tap in $required_taps
-        if not brew tap | grep -q $tap 2>/dev/null
+        if not brew tap | grep -qx $tap 2>/dev/null
             if not brew tap $tap 2>/dev/null
                 echo "Warning: Failed to add tap $tap" >&2
                 return 1
@@ -540,6 +547,12 @@ end
 # APT PROVIDER (Ubuntu/Debian with Ondřej Surý PPA)
 # =============================================================================
 
+# Validate input for APT commands (prevents command injection)
+function __phpenv_validate_apt_input -a input
+    # Only allow alphanumeric, dots, and hyphens
+    string match -rq '^[a-zA-Z0-9.-]+$' $input
+end
+
 function __phpenv_provider_apt_detect
     command -q apt-get
 end
@@ -620,16 +633,21 @@ function __phpenv_provider_apt_get_php_path -a phpenv_version
         return 1
     end
 
-    # Create/update symlinks for PHP binaries
+    # Create/update symlinks for PHP binaries using atomic operation
     set -l binaries php php-config phpize phar phar.phar
     for binary in $binaries
         set -l source "/usr/bin/$binary$phpenv_version"
         set -l target "$shim_dir/$binary"
 
         if test -x "$source"
-            ln -sf "$source" "$target" 2>/dev/null
+            # Atomic symlink creation: create temp link, then move
+            set -l temp_link "$target.$fish_pid"
+            ln -s "$source" "$temp_link" 2>/dev/null
+            and mv -f "$temp_link" "$target" 2>/dev/null
         else if test "$binary" = "phar"; and test -x "/usr/bin/phar$phpenv_version"
-            ln -sf "/usr/bin/phar$phpenv_version" "$target" 2>/dev/null
+            set -l temp_link "$target.$fish_pid"
+            ln -s "/usr/bin/phar$phpenv_version" "$temp_link" 2>/dev/null
+            and mv -f "$temp_link" "$target" 2>/dev/null
         end
     end
 
@@ -641,6 +659,12 @@ function __phpenv_provider_apt_is_installed -a phpenv_version
 end
 
 function __phpenv_provider_apt_install -a phpenv_version
+    # Validate input before using in sudo commands
+    if not __phpenv_validate_apt_input $phpenv_version
+        echo "Error: Invalid version format" >&2
+        return 1
+    end
+
     if not __phpenv_provider_apt_ensure_source
         return 1
     end
@@ -663,6 +687,12 @@ function __phpenv_provider_apt_install -a phpenv_version
 end
 
 function __phpenv_provider_apt_uninstall -a phpenv_version
+    # Validate input before using in sudo commands
+    if not __phpenv_validate_apt_input $phpenv_version
+        echo "Error: Invalid version format" >&2
+        return 1
+    end
+
     echo "Uninstalling PHP $phpenv_version..."
 
     # Remove all packages for this PHP version
@@ -681,7 +711,11 @@ function __phpenv_provider_apt_uninstall -a phpenv_version
         if test -L "$shim_dir/php"
             set -l target (readlink "$shim_dir/php")
             if string match -q "*php$phpenv_version*" "$target"
-                rm -f "$shim_dir"/*
+                # Remove only known phpenv binaries instead of using glob
+                set -l known_binaries php php-config phpize phar phar.phar
+                for binary in $known_binaries
+                    rm -f "$shim_dir/$binary"
+                end
             end
         end
         return 0
@@ -692,6 +726,16 @@ function __phpenv_provider_apt_uninstall -a phpenv_version
 end
 
 function __phpenv_provider_apt_ext_install -a phpenv_extension phpenv_version
+    # Validate inputs before using in sudo commands
+    if not __phpenv_validate_apt_input $phpenv_extension
+        echo "Error: Invalid extension name" >&2
+        return 1
+    end
+    if not __phpenv_validate_apt_input $phpenv_version
+        echo "Error: Invalid version format" >&2
+        return 1
+    end
+
     if not __phpenv_provider_apt_ensure_source
         return 1
     end
@@ -722,7 +766,28 @@ function __phpenv_provider_apt_ext_install -a phpenv_extension phpenv_version
 end
 
 function __phpenv_provider_apt_ext_uninstall -a phpenv_extension phpenv_version
+    # Validate inputs before using in sudo commands
+    if not __phpenv_validate_apt_input $phpenv_extension
+        echo "Error: Invalid extension name" >&2
+        return 1
+    end
+    if not __phpenv_validate_apt_input $phpenv_version
+        echo "Error: Invalid version format" >&2
+        return 1
+    end
+
+    # Map extension names to package names (mirror install logic)
     set -l package_name "php$phpenv_version-$phpenv_extension"
+
+    # Some extensions have different package names
+    switch $phpenv_extension
+        case mysql
+            set package_name "php$phpenv_version-mysql"
+        case pdo
+            set package_name "php$phpenv_version-mysql php$phpenv_version-pgsql php$phpenv_version-sqlite3"
+        case gd
+            set package_name "php$phpenv_version-gd"
+    end
 
     echo "Uninstalling $phpenv_extension for PHP $phpenv_version..."
 
@@ -766,8 +831,8 @@ end
 function __phpenv_provider_apt_get_path_pattern
     # Pattern to match phpenv shim directory in PATH
     set -l shim_dir (__phpenv_get_shim_dir)
-    # Escape special regex characters in path
-    echo $shim_dir | sed 's/[[\.*^$()+?{|]/\\&/g'
+    # Escape special regex characters using Fish's built-in escape
+    string escape --style=regex $shim_dir
 end
 
 function __phpenv_provider_apt_doctor
@@ -961,13 +1026,8 @@ function __phpenv_set_php_path -a phpenv_version
         if test "$phpenv_path_entry" = "$phpenv_shim_dir"
             continue
         end
-        # Skip apt PHP paths
-        if echo $phpenv_path_entry | grep -qE "^/usr/bin\$"
-            # Don't remove /usr/bin, but we'll handle this via shims
-            set -a phpenv_clean_path $phpenv_path_entry
-        else
-            set -a phpenv_clean_path $phpenv_path_entry
-        end
+        # Add to clean path (shim directory at front handles version selection)
+        set -a phpenv_clean_path $phpenv_path_entry
     end
 
     # Set new PATH with PHP version at front
