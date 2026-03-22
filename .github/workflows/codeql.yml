@@ -1,7 +1,6 @@
 ---
 # yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
 name: "CodeQL"
-
 on:
   push:
     branches: ["main"]
@@ -11,16 +10,15 @@ on:
     - cron: "30 1 * * 0"
   merge_group:
 
-permissions: {}
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      actions: read
-      contents: read
-      packages: read
       security-events: write
     strategy:
       fail-fast: false
@@ -28,7 +26,6 @@ jobs:
         language: ["actions"]
     steps:
       - name: CodeQL Analysis
-        uses: ivuorinen/actions/codeql-analysis@dc85cef1c285edd3d2edcb4a7c82bdd08ccc7c56 # v2026.03.20
+        uses: ivuorinen/actions/codeql-analysis@main
         with:
           language: ${{ matrix.language }}
-          queries: security-and-quality
