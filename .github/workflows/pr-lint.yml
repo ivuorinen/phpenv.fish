@@ -36,7 +36,7 @@ jobs:
 
       - name: Run PR Lint
         # https://github.com/ivuorinen/actions
-        uses: ivuorinen/actions/pr-lint@0795e029fb0083fe692fb10b4ed6132822b069e6 # v2026.04.06
+        uses: ivuorinen/actions/pr-lint@f2d15a840e8888ba4f0c348ea70b6522cf2dc541 # v2026.04.15
         with:
           username: 'github-actions'
           email: 'github-actions@github.com'
