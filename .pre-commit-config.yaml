@@ -76,7 +76,7 @@ repos:
 
   # Security scanning
   - repo: https://github.com/bridgecrewio/checkov.git
-    rev: '3.2.529'
+    rev: '3.2.530'
     hooks:
       - id: checkov
         args:
