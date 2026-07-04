@@ -8,10 +8,10 @@ on:
   workflow_call:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  packages: read
-  statuses: read
+concurrency:
+  group: ${{ github.workflow }}
+
+permissions: {}
 
 jobs:
   stale:
@@ -20,7 +20,7 @@ jobs:
 
     permissions:
       contents: write # only for delete-branch option
-      issues: write
-      pull-requests: write
+      issues: write # label and close stale issues
+      pull-requests: write # label and close stale PRs
     steps:
       - uses: ivuorinen/actions/stale@de31e11dda6488eabe95e951ebb61c6d9d500865 # v2026.06.30

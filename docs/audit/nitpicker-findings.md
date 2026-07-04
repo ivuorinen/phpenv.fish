@@ -8,10 +8,11 @@ Pass 2 scope: whole repository — providers, PATH management, config system,
 completions, conf.d, Fisher packaging, CI, docs.
 Pass 4 scope: re-review of pass 2/3 fixes plus repo config; pre-commit all-files run (green).
 Pass 5 scope: documentation accuracy — README, CONTRIBUTING, CLAUDE.md, help text.
+Pass 6 scope: workflow security — zizmor --persona auditor.
 
 ## Summary
 
-- Total: 29 | Open: 0 | Fixed: 29 | Invalid: 0
+- Total: 30 | Open: 0 | Fixed: 30 | Invalid: 0
 
 ## Open Findings
 
@@ -232,6 +233,18 @@ apt/Ondřej provider (half the implementation); `phpenv use system` / no-arg aut
 absent from the command list; `.tool-versions`, MAJOR.MINOR normalization, and the test
 suite absent from CONTRIBUTING/CLAUDE.md/help text. All corrected; quality-check
 instructions now use `fish -n` plus the test suite.
+
+### Pass 6 — 2026-07-04
+
+#### [NIT-30] Workflow hardening: 11 zizmor auditor-persona findings
+
+Fixed: 2026-07-04
+Notes: Medium (worst: excessive-permissions). `permissions: read-all` in pr-lint and
+sync-labels replaced with `{}` (jobs declare their own); every permission line now carries an
+explanatory comment; codeql and stale gained concurrency limits; sync-labels checkout sets
+`persist-credentials: false` and drops its redundant token input. One documented exception:
+pr-lint's checkout keeps `persist-credentials: true` (the action pushes autofix commits) with
+an inline `zizmor: ignore[artipacked]`. Result: zero live findings, one ignored.
 
 ## Invalid
 
