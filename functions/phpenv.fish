@@ -962,11 +962,6 @@ function __phpenv_get_cellar_path
     echo $__phpenv_cellar_cache
 end
 
-# Legacy function - redirect to provider
-function __phpenv_ensure_taps
-    __phpenv_ensure_source
-end
-
 function __phpenv_parse_version_field -a field fallback
     set -l version_info (__phpenv_get_version_info)
     if test -n "$version_info"
@@ -1250,47 +1245,21 @@ function __phpenv_versions
     end
 end
 
-function __phpenv_get_tap_versions
-    if not command -q brew
-        return
-    end
-
-    set -l phpenv_formulas (__phpenv_get_tap_formulas "shivammathur/php")
-
-    if test -z "$phpenv_formulas"
-        return
-    end
-
-    set -l phpenv_versions
-    set -l phpenv_version_info (__phpenv_get_version_info)
-    set -l phpenv_latest_version (echo $phpenv_version_info | jq -r '.latest // "8.4"' 2>/dev/null)
-
-    for phpenv_formula in $phpenv_formulas
-        set -l phpenv_clean_name (echo $phpenv_formula | sed 's|shivammathur/php/||')
-
-        if echo $phpenv_clean_name | grep -qE '(debug|zts|autoconf|bison)'
-            continue
-        end
-
-        if test "$phpenv_clean_name" = "php"
-            set -a phpenv_versions "$phpenv_latest_version (latest)"
-        else if echo $phpenv_clean_name | grep -qE '^php@[0-9]+\.[0-9]+$'
-            set -l phpenv_version (echo $phpenv_clean_name | sed 's/php@//')
-            set -a phpenv_versions $phpenv_version
-        end
-    end
-
-    if test (count $phpenv_versions) -gt 0
-        printf '%s\n' $phpenv_versions | sort -V | tr '\n' ' ' | sed 's/ $//'
-        echo ""
-    end
-end
-
 function __phpenv_which -a phpenv_binary
     set -l phpenv_binary (test -n "$phpenv_binary"; and echo $phpenv_binary; or echo "php")
     set -l phpenv_version (__phpenv_detect_version)
 
     if test -n "$phpenv_version"
+        # apt: answer from /usr/bin directly; __phpenv_get_php_path rewrites
+        # shim symlinks as a side effect and a query must not mutate state
+        if test (__phpenv_get_provider) = apt
+            if test -x "/usr/bin/$phpenv_binary$phpenv_version"
+                echo "/usr/bin/$phpenv_binary$phpenv_version"
+                return 0
+            end
+            echo "$phpenv_binary not found for PHP $phpenv_version"
+            return 1
+        end
         set -l phpenv_php_path (__phpenv_get_php_path $phpenv_version)
         if test -x "$phpenv_php_path/$phpenv_binary"
             echo "$phpenv_php_path/$phpenv_binary"
@@ -1372,22 +1341,6 @@ function __phpenv_config -a phpenv_action phpenv_key phpenv_value
     end
 end
 
-# Helper function to get environment variable value
-function __phpenv_get_env_var -a key
-    switch $key
-        case global-version
-            echo $PHPENV_GLOBAL_VERSION
-        case auto-install
-            echo $PHPENV_AUTO_INSTALL
-        case auto-install-extensions
-            echo $PHPENV_AUTO_INSTALL_EXTENSIONS
-        case auto-switch
-            echo $PHPENV_AUTO_SWITCH
-        case default-extensions
-            echo $PHPENV_DEFAULT_EXTENSIONS
-    end
-end
-
 # Helper function to map config key to env var name
 function __phpenv_env_var_name -a key
     switch $key
@@ -1409,29 +1362,13 @@ end
 function __phpenv_config_get -a phpenv_key
     set -l phpenv_env_var (__phpenv_env_var_name $phpenv_key)
     set -l phpenv_value
-    set -l phpenv_source
-
-    # Check if environment variable is set
     if test -n "$phpenv_env_var"; and set -q $phpenv_env_var
-        set phpenv_value (eval echo \$$phpenv_env_var)
-        set phpenv_source "fish universal variable"
-    else
-        # Check config files if environment variable is unset
-        for phpenv_config_file in ~/.config/fish/conf.d/phpenv.fish ~/.config/phpenv/config ~/.phpenv.fish
-            if test -f $phpenv_config_file
-                set -l phpenv_file_value (grep "^$phpenv_key=" $phpenv_config_file | cut -d= -f2- | head -1)
-                if test -n "$phpenv_file_value"
-                    set phpenv_value $phpenv_file_value
-                    set phpenv_source $phpenv_config_file
-                    break
-                end
-            end
-        end
+        set phpenv_value $$phpenv_env_var
     end
 
     if test "$argv[2]" = "--verbose"
         if test -n "$phpenv_value"
-            echo "$phpenv_key = $phpenv_value (from $phpenv_source)"
+            echo "$phpenv_key = $phpenv_value"
         else
             echo "$phpenv_key = (not set)"
         end
@@ -1587,22 +1524,6 @@ end
 
 function __phpenv_get_available_extensions
     __phpenv_get_tap_formulas "shivammathur/extensions"
-end
-
-function __phpenv_extension_available -a phpenv_extension phpenv_version
-    set -l phpenv_available_extensions (__phpenv_get_available_extensions)
-
-    if test -z "$phpenv_available_extensions"
-        return 0  # Assume available if can't check
-    end
-
-    for phpenv_ext_formula in $phpenv_available_extensions
-        if test "$phpenv_ext_formula" = "shivammathur/extensions/$phpenv_extension@$phpenv_version"
-            return 0
-        end
-    end
-
-    return 1
 end
 
 function __phpenv_extensions_available
