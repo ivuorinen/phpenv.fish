@@ -63,36 +63,40 @@ function __phpenv_detect_version
     if test -n "$phpenv_version_file"
         set -l phpenv_version (string trim < $phpenv_version_file)
         if test -n "$phpenv_version"
-            echo $phpenv_version
+            __phpenv_normalize_version $phpenv_version
             return
         end
     end
 
-    set -l phpenv_tool_version_file (__phpenv_find_version_file .tool-version)
-    if test -n "$phpenv_tool_version_file"
-        set -l phpenv_version (__phpenv_parse_tool_version $phpenv_tool_version_file)
-        if test -n "$phpenv_version"
-            echo $phpenv_version
-            return
+    # .tool-version is the documented name; .tool-versions is the asdf standard
+    for phpenv_tool_filename in .tool-version .tool-versions
+        set -l phpenv_tool_version_file (__phpenv_find_version_file $phpenv_tool_filename)
+        if test -n "$phpenv_tool_version_file"
+            set -l phpenv_version (__phpenv_parse_tool_version $phpenv_tool_version_file)
+            if test -n "$phpenv_version"
+                __phpenv_normalize_version $phpenv_version
+                return
+            end
         end
     end
 
-    if test -f composer.json
-        set -l phpenv_version (__phpenv_parse_composer_version)
+    set -l phpenv_composer_file (__phpenv_find_version_file composer.json)
+    if test -n "$phpenv_composer_file"
+        set -l phpenv_version (__phpenv_parse_composer_version $phpenv_composer_file)
         if test -n "$phpenv_version"
-            echo $phpenv_version
+            __phpenv_normalize_version $phpenv_version
             return
         end
     end
 
     if test -n "$PHPENV_GLOBAL_VERSION"
-        echo $PHPENV_GLOBAL_VERSION
+        __phpenv_normalize_version $PHPENV_GLOBAL_VERSION
         return
     end
 
     set -l phpenv_global_version (__phpenv_config_get global-version)
     if test -n "$phpenv_global_version"
-        echo $phpenv_global_version
+        __phpenv_normalize_version $phpenv_global_version
         return
     end
 
@@ -114,28 +118,40 @@ end
 
 function __phpenv_parse_tool_version -a phpenv_file
     if test -f $phpenv_file
-        set -l phpenv_line (grep "^php " $phpenv_file)
-        if test -n "$phpenv_line"
-            set -l phpenv_parts (string split ' ' $phpenv_line)
-            if test (count $phpenv_parts) -ge 2
-                echo $phpenv_parts[2] | sed 's/^v//'
-            end
+        set -l phpenv_match (string match -r '^php\s+v?(\S+)' < $phpenv_file)
+        if test (count $phpenv_match) -ge 2
+            echo $phpenv_match[2]
         end
     end
 end
 
-function __phpenv_parse_composer_version
-    if not test -f composer.json
+# Providers only package MAJOR.MINOR (shivammathur php@8.1, apt php8.1-cli);
+# strip PATCH and suffixes: 8.1.12 -> 8.1, v8.2.3 -> 8.2, 8.1.x -> 8.1.
+# Aliases (latest, nightly, 8.x) pass through unchanged.
+function __phpenv_normalize_version -a phpenv_version
+    set -l phpenv_match (string match -r '^v?([0-9]+\.[0-9]+)([^0-9].*)?$' -- "$phpenv_version")
+    if test -n "$phpenv_match"
+        echo $phpenv_match[2]
+    else
+        echo $phpenv_version
+    end
+end
+
+function __phpenv_parse_composer_version -a phpenv_composer_file
+    if test -z "$phpenv_composer_file"
+        set phpenv_composer_file composer.json
+    end
+    if not test -f "$phpenv_composer_file"
         return
     end
 
-    set -l phpenv_platform_php (jq -r '.config.platform.php // empty' composer.json 2>/dev/null)
+    set -l phpenv_platform_php (jq -r '.config.platform.php // empty' "$phpenv_composer_file" 2>/dev/null)
     if test $status -eq 0 -a -n "$phpenv_platform_php" -a "$phpenv_platform_php" != "null"
-        echo $phpenv_platform_php
+        __phpenv_normalize_version $phpenv_platform_php
         return
     end
 
-    set -l phpenv_require_php (jq -r '.require.php // empty' composer.json 2>/dev/null)
+    set -l phpenv_require_php (jq -r '.require.php // empty' "$phpenv_composer_file" 2>/dev/null)
     if test $status -eq 0 -a -n "$phpenv_require_php" -a "$phpenv_require_php" != "null"
         __phpenv_parse_semver_constraint $phpenv_require_php
         return
@@ -145,15 +161,18 @@ end
 function __phpenv_parse_semver_constraint -a phpenv_constraint
     set phpenv_constraint (echo $phpenv_constraint | tr -d ' "')
 
-    set -l phpenv_latest_8x (__phpenv_parse_version_field "8.x" "8.4")
-    set -l phpenv_latest_7x (__phpenv_parse_version_field "7.x" "7.4")
-    set -l phpenv_latest (__phpenv_parse_version_field "latest" "8.4")
+    # Exact version constraint (e.g. "8.1.3"): use its MAJOR.MINOR directly.
+    # Must run before the switch: fish globs like '8.*' would swallow it.
+    if string match -rq '^v?[0-9]+(\.[0-9]+)+$' -- $phpenv_constraint
+        __phpenv_normalize_version $phpenv_constraint
+        return
+    end
 
     switch $phpenv_constraint
-        case '^8.*'
-            echo $phpenv_latest_8x
-        case '^7.*'
-            echo $phpenv_latest_7x
+        case '^8.*' '>=8.1' '>=8.0' '>=7.4' '8.*' '8.x.*'
+            __phpenv_parse_version_field "8.x" "8.4"
+        case '^7.*' '7.*' '7.x.*'
+            __phpenv_parse_version_field "7.x" "7.4"
         case '~8.4*'
             echo "8.4"
         case '~8.3*'
@@ -166,16 +185,6 @@ function __phpenv_parse_semver_constraint -a phpenv_constraint
             echo "8.0"
         case '~7.4*'
             echo "7.4"
-        case '>=8.1'
-            echo $phpenv_latest_8x
-        case '>=8.0'
-            echo $phpenv_latest_8x
-        case '>=7.4'
-            echo $phpenv_latest_8x
-        case '8.*' '8.x.*'
-            echo $phpenv_latest_8x
-        case '7.*' '7.x.*'
-            echo $phpenv_latest_7x
         case '5.*' '5.x.*'
             echo "5.6"
         case '*'
@@ -185,7 +194,7 @@ function __phpenv_parse_semver_constraint -a phpenv_constraint
             if test -n "$version_match"
                 echo $version_match[1]
             else
-                echo $phpenv_latest
+                __phpenv_parse_version_field "latest" "8.4"
             end
     end
 end
@@ -964,11 +973,15 @@ end
 
 function __phpenv_parse_version_field -a field fallback
     set -l version_info (__phpenv_get_version_info)
+    set -l value
     if test -n "$version_info"
-        echo $version_info | jq -r ".$field // \"$fallback\"" 2>/dev/null
-    else
-        echo $fallback
+        # Bracket notation: fields like "8.x" are not valid jq path syntax
+        set value (echo $version_info | jq -r ".[\"$field\"] // \"$fallback\"" 2>/dev/null)
     end
+    if test -z "$value"
+        set value $fallback
+    end
+    __phpenv_normalize_version $value
 end
 
 function __phpenv_resolve_version_alias -a phpenv_version
@@ -984,7 +997,7 @@ function __phpenv_resolve_version_alias -a phpenv_version
         case '5.x'
             __phpenv_parse_version_field "5.x" "5.6"
         case '*'
-            echo $phpenv_version
+            __phpenv_normalize_version $phpenv_version
     end
 end
 
@@ -1113,6 +1126,8 @@ function __phpenv_uninstall -a phpenv_version
         return 1
     end
 
+    set phpenv_version (__phpenv_resolve_version_alias $phpenv_version)
+
     if not __phpenv_is_version_installed $phpenv_version
         echo "PHP $phpenv_version is not installed"
         return 1
@@ -1151,6 +1166,8 @@ function __phpenv_use
         echo "Detected PHP $phpenv_version for this project"
     end
 
+    set phpenv_version (__phpenv_resolve_version_alias $phpenv_version)
+
     if not __phpenv_is_version_installed $phpenv_version
         if test "$(__phpenv_config_get auto-install)" = "true"
             __phpenv_install $phpenv_version
@@ -1174,6 +1191,12 @@ function __phpenv_local -a phpenv_version
         return 1
     end
 
+    set phpenv_version (__phpenv_normalize_version $phpenv_version)
+    if not __phpenv_validate_version $phpenv_version
+        echo "Invalid PHP version: $phpenv_version"
+        echo "Run 'phpenv versions' to see available versions"
+        return 1
+    end
     echo $phpenv_version > .php-version
     echo "Set local PHP version to $phpenv_version"
 end
@@ -1184,6 +1207,12 @@ function __phpenv_global -a phpenv_version
         return 1
     end
 
+    set phpenv_version (__phpenv_normalize_version $phpenv_version)
+    if not __phpenv_validate_version $phpenv_version
+        echo "Invalid PHP version: $phpenv_version"
+        echo "Run 'phpenv versions' to see available versions"
+        return 1
+    end
     set -U PHPENV_GLOBAL_VERSION $phpenv_version
     echo "Set global PHP version to $phpenv_version"
 end
@@ -1385,6 +1414,7 @@ function __phpenv_config_set -a phpenv_key phpenv_value
 
     switch $phpenv_key
         case global-version
+            set phpenv_value (__phpenv_normalize_version $phpenv_value)
             if __phpenv_validate_version $phpenv_value
                 set -U PHPENV_GLOBAL_VERSION $phpenv_value
             else
@@ -1629,6 +1659,10 @@ function __phpenv_auto_switch --on-variable PWD
         return 0
     end
 
+    # Resolve aliases (e.g. .php-version containing "latest") so the
+    # installed check compares real versions; no-op for MAJOR.MINOR input
+    set phpenv_new_version (__phpenv_resolve_version_alias $phpenv_new_version)
+
     # Check if we're already using the correct version
     if set -q PHPENV_CURRENT_VERSION; and test "$PHPENV_CURRENT_VERSION" = "$phpenv_new_version"
         return 0
@@ -1671,10 +1705,11 @@ function __phpenv_help
     echo ""
     echo "Version sources (in order of priority):"
     echo "  1. .php-version file"
-    echo "  2. .tool-version file"
+    echo "  2. .tool-version / .tool-versions file"
     echo "  3. composer.json"
     echo "  4. Global version"
     echo "  5. System PHP"
+    echo "  Versions are normalized to MAJOR.MINOR (8.1.12 -> 8.1)"
     echo ""
     echo "Supported providers:"
     echo "  homebrew    macOS/Linux with Homebrew (shivammathur/php tap)"
