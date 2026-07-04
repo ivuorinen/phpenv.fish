@@ -16,8 +16,8 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
 
 ### Prerequisites
 
-- Fish Shell 3.0+
-- Homebrew (for PHP version management)
+- Fish Shell 3.4+ (the code uses `"$(...)"` command substitution)
+- Homebrew, or apt with the Ondřej Surý PPA (for PHP version management)
 - jq (JSON processor)
 - Git
 
@@ -59,7 +59,13 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
 
 ### Testing Changes
 
-Since this is a Fish shell plugin, test changes by:
+Run the test suite:
+
+```bash
+fish tests/version-detection.fish
+```
+
+Then test interactively:
 
 ```bash
 # Reload the function after changes
@@ -91,23 +97,26 @@ phpenv list
    - Fetches available versions dynamically from shivammathur/setup-php
 
 3. **Configuration (`conf.d/phpenv.fish`)**
-   - Sets up Fish universal variables on load
+   - Sets up session variable defaults on load (only `PHPENV_GLOBAL_VERSION` is universal)
    - Handles PATH initialization
 
 ### Key Design Patterns
 
 - **Performance Focus**: Direct directory checks instead of `brew list` (100-1000x faster)
-- **Fish Universal Variables**: Used for configuration persistence
-- **Homebrew Integration**: Uses shivammathur taps for PHP/extension installation
-- **Version File Priority**: `.php-version` > `.tool-version` > `composer.json` > global > system
+- **Provider Abstraction**: Homebrew (shivammathur taps) or apt (Ondřej PPA), auto-detected
+- **Version File Priority**: `.php-version` > `.tool-version`/`.tool-versions` > `composer.json` > global > system
+- **MAJOR.MINOR Normalization**: `__phpenv_normalize_version` strips PATCH everywhere,
+  because providers only package MAJOR.MINOR
 
 ### Version Detection Flow
 
-1. Check for `.php-version` file (exact version)
-2. Check for `.tool-version` file (parse PHP line)
+1. Check for `.php-version` file
+2. Check for `.tool-version` / `.tool-versions` file (parse PHP line)
 3. Check `composer.json` for PHP constraints (semver resolution)
 4. Use global version from Fish universal variable
 5. Fall back to system PHP
+
+All results are normalized to MAJOR.MINOR.
 
 ## Making Changes
 
@@ -243,7 +252,7 @@ The codebase uses intelligent caching:
 Use unified helper functions to avoid code duplication:
 
 - `__phpenv_parse_version_field`: Single function for all jq parsing
-- `__phpenv_ensure_taps`: Unified Homebrew tap management
+- `__phpenv_ensure_source`: Unified provider source management (Homebrew taps / apt PPA)
 - `__phpenv_get_tap_formulas`: Shared formula listing logic
 
 ## Submitting Changes
@@ -261,11 +270,12 @@ Use unified helper functions to avoid code duplication:
    - Follow the existing code style
    - Add tests if applicable
 
-3. **Run quality checks**:
+3. **Run quality checks** (shellcheck does not support fish; use fish's own parser):
 
    ```bash
    pre-commit run --all-files
-   shellcheck functions/phpenv.fish
+   fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish
+   fish tests/version-detection.fish
    ```
 
 4. **Test thoroughly**:

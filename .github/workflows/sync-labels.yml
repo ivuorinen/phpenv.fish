@@ -20,7 +20,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: read-all
+permissions: {}
 
 jobs:
   labels:
@@ -29,13 +29,13 @@ jobs:
     timeout-minutes: 10
 
     permissions:
-      contents: read
-      issues: write
+      contents: read # read .github/labels.yml
+      issues: write # create, update and delete labels
 
     steps:
       - name: ⤵️ Checkout Repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
       - name: ⤵️ Sync Latest Labels Definitions
         uses: ivuorinen/actions/sync-labels@de31e11dda6488eabe95e951ebb61c6d9d500865 # v2026.06.30

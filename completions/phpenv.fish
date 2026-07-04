@@ -25,7 +25,7 @@ end
 
 function __phpenv_complete_available_versions
     # Try to get dynamic versions first
-    if command -q curl -a command -q jq; and functions -q __phpenv_parse_version_field
+    if command -q curl; and command -q jq; and functions -q __phpenv_parse_version_field
         echo "latest"
         echo "nightly"
         echo "5.x"
@@ -36,10 +36,10 @@ function __phpenv_complete_available_versions
         __phpenv_parse_version_field "5.x" "5.6"
         __phpenv_parse_version_field "7.x" "7.4"
         __phpenv_parse_version_field "8.x" "8.4"
+    else
+        # Fallback to common versions
+        printf "5.6\n7.0\n7.1\n7.2\n7.3\n7.4\n8.0\n8.1\n8.2\n8.3\n8.4\n8.5\n"
     end
-
-    # Fallback to common versions
-    printf "5.6\n7.0\n7.1\n7.2\n7.3\n7.4\n8.0\n8.1\n8.2\n8.3\n8.4\n8.5\n"
 end
 
 function __phpenv_complete_config_keys
