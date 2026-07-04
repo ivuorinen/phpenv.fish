@@ -6,13 +6,22 @@ A fast, feature-rich PHP version manager for Fish Shell that acts like goenv or 
 
 - **Fast version detection** (100-1000x faster than `brew list`)
 - **Dynamic version resolution** from [shivammathur/setup-php](https://github.com/shivammathur/setup-php)
-- **Multiple version sources**: `.php-version`, `.tool-version`, `composer.json`
+- **Multiple version sources**: `.php-version`, `.tool-version(s)`, `composer.json`
 - **Auto-installation** of missing PHP versions
 - **Extension management** with availability checking
 - **Composer.json integration** with full semver support
 - **Auto-switching** between versions (configurable)
 - **Fisher package manager** support
 - **Rich completions** with descriptions
+
+## Providers
+
+phpenv auto-detects how to install PHP:
+
+- **homebrew** - macOS, or Linux with Homebrew (shivammathur/php tap)
+- **apt** - Ubuntu/Debian with the [Ondřej Surý PPA](https://launchpad.net/~ondrej/+archive/ubuntu/php)
+
+Override with `set -gx PHPENV_PROVIDER homebrew` (or `apt`).
 
 ## Installation
 
@@ -40,10 +49,10 @@ fisher install ivuorinen/phpenv.fish
 2. Install dependencies:
 
    ```bash
-   brew install jq
+   brew install jq        # or: sudo apt-get install jq
    ```
 
-3. Add Homebrew taps:
+3. Homebrew provider only — add the taps (done automatically on first install):
 
    ```bash
    brew tap shivammathur/php
@@ -84,7 +93,7 @@ phpenv doctor
 
 - `phpenv install <version>` - Install PHP version
 - `phpenv uninstall <version>` - Uninstall PHP version
-- `phpenv use <version>` - Use version for current shell
+- `phpenv use [version|system]` - Use version for current shell (auto-detects if omitted; `system` restores PATH)
 - `phpenv local <version>` - Set version for current project
 - `phpenv global <version>` - Set global default version
 - `phpenv list` - List installed versions
@@ -115,19 +124,24 @@ phpenv doctor
 phpenv automatically detects PHP versions from multiple sources (in priority order):
 
 1. **`.php-version`** - Project-specific version file
-2. **`.tool-version`** - Tool version file (parses `v8.4` as `8.4`)
+2. **`.tool-version`** / **`.tool-versions`** (asdf) - Tool version file (parses `v8.4` as `8.4`)
 3. **`composer.json`** - Both `config.platform.php` and `require.php` with semver support
 4. **Global version** - Fish universal variable
 5. **System PHP** - Fallback to system installation
+
+Detected versions are always normalized to MAJOR.MINOR (`8.1.12` → `8.1`),
+because both the shivammathur Homebrew taps and the Ondřej apt PPA only
+package MAJOR.MINOR versions (`php@8.1`, `php8.1-cli`, `php8.1-xml`).
 
 ### Composer.json Support
 
 Supports all semver constraints:
 
-- `^8.1` → Uses PHP 8.3 (latest 8.x)
+- `^8.1` → Uses latest 8.x
 - `~8.2.0` → Uses PHP 8.2
-- `>=8.0` → Uses PHP 8.3
+- `>=8.0` → Uses latest 8.x
 - `8.1.*` → Uses PHP 8.1
+- `8.1.3` → Uses PHP 8.1
 
 Checks both locations:
 
@@ -154,13 +168,8 @@ Checks both locations:
 - `default-extensions` - Space-separated list of default extensions (default: "opcache")
 - `global-version` - Global PHP version
 
-### Configuration Files
-
-phpenv checks these locations (in order):
-
-1. `~/.config/fish/conf.d/phpenv.fish` (preferred)
-2. `~/.config/phpenv/config`
-3. `~/.phpenv.fish`
+Configuration lives in fish variables (set via `phpenv config set` or in
+`~/.config/fish/conf.d/phpenv.fish`); only `global-version` persists across shells.
 
 ### Examples
 
@@ -294,6 +303,9 @@ ln -sf $PWD/conf.d/phpenv.fish ~/.config/fish/conf.d/phpenv.fish
 # Install pre-commit hooks
 pip install pre-commit
 pre-commit install
+
+# Run the test suite
+fish tests/version-detection.fish
 ```
 
 ## Performance Optimizations

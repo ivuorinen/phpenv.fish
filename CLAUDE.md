@@ -14,6 +14,12 @@ It provides fast PHP version switching, extension management, and automatic vers
 Since this is a Fish shell plugin, test changes by:
 
 ```bash
+# Run the test suite
+fish tests/version-detection.fish
+
+# Syntax-check all sources
+fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish
+
 # Reload the function after changes
 source functions/phpenv.fish
 
@@ -46,31 +52,36 @@ ln -sf $PWD/conf.d/phpenv.fish ~/.config/fish/conf.d/phpenv.fish
    - Fetches available versions dynamically from shivammathur/setup-php
 
 3. **Configuration (`conf.d/phpenv.fish`)**
-   - Sets up Fish universal variables on load
+   - Sets up session variable defaults on load (only `PHPENV_GLOBAL_VERSION` is universal)
    - Handles PATH initialization
 
 ### Key Design Patterns
 
 - **Performance Focus**: Direct directory checks instead of `brew list` (100-1000x faster)
-- **Fish Universal Variables**: Used for configuration persistence
-- **Homebrew Integration**: Uses shivammathur taps for PHP/extension installation
-- **Version File Priority**: `.php-version` > `.tool-version` > `composer.json` > global > system
+- **Provider Abstraction**: homebrew (shivammathur taps) or apt (Ondřej PPA), auto-detected
+  via `__phpenv_get_provider`, overridable with `PHPENV_PROVIDER`
+- **Version File Priority**: `.php-version` > `.tool-version`/`.tool-versions` > `composer.json` > global > system
+- **MAJOR.MINOR Normalization**: All detected/entered versions are stripped to MAJOR.MINOR
+  (`__phpenv_normalize_version`) because providers only package MAJOR.MINOR (`php@8.1`, `php8.1-cli`)
 
 ### Version Detection Flow
 
-1. Check for `.php-version` file (exact version)
-2. Check for `.tool-version` file (parse PHP line)
+1. Check for `.php-version` file
+2. Check for `.tool-version` / `.tool-versions` file (parse PHP line)
 3. Check `composer.json` for PHP constraints (semver resolution)
 4. Use global version from Fish universal variable
 5. Fall back to system PHP
 
+All results are normalized to MAJOR.MINOR. Files are searched upward from
+the current directory (composer.json included).
+
 ### Important Implementation Details
 
 - All internal functions are prefixed with `__phpenv_`
-- Version resolution supports semver constraints (^8.1, ~8.2.0, etc.)
-- Extension management uses separate Homebrew tap
-- Auto-switching uses Fish's `pwd` event handler
-- Configuration stored in Fish universal variables with `PHPENV_` prefix
+- Version resolution supports semver constraints (^8.1, ~8.2.0, exact versions, etc.)
+- Extension management uses the shivammathur/extensions tap (homebrew) or php<ver>-<ext> packages (apt)
+- Auto-switching uses Fish's `pwd` event handler; it never prompts (installs run with stdin from /dev/null)
+- Configuration stored in fish variables with `PHPENV_` prefix (session scope; global-version is universal)
 
 ## Code Style Requirements
 
@@ -133,7 +144,7 @@ ln -sf $PWD/conf.d/phpenv.fish ~/.config/fish/conf.d/phpenv.fish
 #### Unified Helper Functions
 
 - `__phpenv_parse_version_field`: Single function for all jq parsing (eliminates 9+ duplicated calls)
-- `__phpenv_ensure_taps`: Unified Homebrew tap management
+- `__phpenv_ensure_source`: Unified provider source management (Homebrew taps / apt PPA)
 - `__phpenv_get_available_extensions`: Shared extension listing logic
 
 ### PATH Management Best Practices
