@@ -1,0 +1,41 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Fish tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install fish and jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fish jq
+
+      - name: Syntax check
+        run: |
+          fish -n functions/phpenv.fish
+          fish -n conf.d/phpenv.fish
+          fish -n completions/phpenv.fish
+
+      - name: Run tests
+        run: fish tests/version-detection.fish
