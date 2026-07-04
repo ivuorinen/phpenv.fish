@@ -169,7 +169,9 @@ Checks both locations:
 - `global-version` - Global PHP version
 
 Configuration lives in fish variables (set via `phpenv config set` or in
-`~/.config/fish/conf.d/phpenv.fish`); only `global-version` persists across shells.
+`~/.config/fish/conf.d/phpenv.fish`); all settings are session-scoped except
+`global-version`, whose backing `PHPENV_GLOBAL_VERSION` is a universal variable
+that persists across shells.
 
 ### Examples
 

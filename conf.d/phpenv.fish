@@ -37,7 +37,7 @@ if test -n "$PHPENV_GLOBAL_VERSION"; and not set -q PHPENV_INITIALIZED
             if not __phpenv_find_version_file .php-version >/dev/null 2>&1
                 if not __phpenv_find_version_file .tool-version >/dev/null 2>&1
                     if not __phpenv_find_version_file .tool-versions >/dev/null 2>&1
-                        if not test -f composer.json
+                        if not __phpenv_find_version_file composer.json >/dev/null 2>&1
                             __phpenv_set_php_path "$PHPENV_GLOBAL_VERSION" 2>/dev/null
                         end
                     end

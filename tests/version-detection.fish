@@ -47,6 +47,16 @@ else
     set -g test_failures (math $test_failures + 1)
 end
 
+# Bare 8.x/7.x constraints resolve via the '8.*'/'7.*' glob cases
+set -l bare8 (__phpenv_parse_semver_constraint '8.x')
+if string match -rq '^8\.[0-9]+$' $bare8
+    echo "ok   constraint 8.x -> 8.MINOR ($bare8)"
+else
+    echo "FAIL constraint 8.x: got '$bare8', not 8.MINOR"
+    set -g test_failures (math $test_failures + 1)
+end
+assert_eq (__phpenv_parse_semver_constraint '7.x') 7.4 "constraint 7.x -> 7.4"
+
 # jq bracket-notation regression: "8.x" is not valid jq path syntax
 set -l field_8x (__phpenv_parse_version_field "8.x" "8.4")
 if string match -rq '^[0-9]+\.[0-9]+$' $field_8x
@@ -57,7 +67,8 @@ else
 end
 
 # --- composer.json and version files, end to end ---------------------------
-set -l tmpdir (mktemp -d)
+# -t fallback covers BSD/macOS mktemp variants that require a template
+set -l tmpdir (mktemp -d 2>/dev/null; or mktemp -d -t phpenv-test)
 pushd $tmpdir
 
 echo '{"config":{"platform":{"php":"8.1.12"}}}' > composer.json
