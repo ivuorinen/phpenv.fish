@@ -473,13 +473,49 @@ function __phpenv_provider_homebrew_uninstall -a phpenv_version
     end
 end
 
+# Extensions compiled into shivammathur/php builds (from the formulas' configure
+# flags; intl is built and bundled separately by the formula). These have no
+# formula in shivammathur/extensions — brew install would fail on them.
+set -g __phpenv_homebrew_builtin_extensions bcmath bz2 calendar ctype curl dba dom exif ffi \
+    fileinfo filter ftp gd gettext gmp iconv intl json ldap mbstring mysql mysqli mysqlnd \
+    opcache openssl pcntl pdo pdo_mysql pdo_odbc pdo_pgsql pdo_sqlite pgsql phar posix \
+    readline session shmop simplexml soap sockets sodium sqlite3 sysvmsg sysvsem sysvshm tidy \
+    tokenizer xml xmlreader xmlwriter xsl zip zlib
+
+function __phpenv_homebrew_ext_is_builtin -a phpenv_extension phpenv_version
+    # pspell left core PHP in 8.4; older shivammathur builds bundle it
+    if test "$phpenv_extension" = pspell
+        contains -- $phpenv_version 5.6 7.0 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3
+        return
+    end
+    contains -- $phpenv_extension $__phpenv_homebrew_builtin_extensions
+end
+
+# Map extension names to their shivammathur/extensions formula name
+function __phpenv_homebrew_ext_formula_name -a phpenv_extension
+    switch $phpenv_extension
+        case redis
+            echo phpredis
+        case http
+            echo pecl_http
+        case '*'
+            echo $phpenv_extension
+    end
+end
+
 function __phpenv_provider_homebrew_ext_install -a phpenv_extension phpenv_version
+    if __phpenv_homebrew_ext_is_builtin $phpenv_extension $phpenv_version
+        echo "$phpenv_extension is built into shivammathur/php@$phpenv_version, nothing to install"
+        return 0
+    end
+
     if not __phpenv_provider_homebrew_ensure_source
         echo "Error: Failed to set up Homebrew taps"
         return 1
     end
 
-    set -l phpenv_formula "shivammathur/extensions/$phpenv_extension@$phpenv_version"
+    set -l phpenv_formula_name (__phpenv_homebrew_ext_formula_name $phpenv_extension)
+    set -l phpenv_formula "shivammathur/extensions/$phpenv_formula_name@$phpenv_version"
     if brew install $phpenv_formula
         echo "$phpenv_extension@$phpenv_version installed successfully"
         return 0
@@ -490,7 +526,13 @@ function __phpenv_provider_homebrew_ext_install -a phpenv_extension phpenv_versi
 end
 
 function __phpenv_provider_homebrew_ext_uninstall -a phpenv_extension phpenv_version
-    set -l phpenv_formula "shivammathur/extensions/$phpenv_extension@$phpenv_version"
+    if __phpenv_homebrew_ext_is_builtin $phpenv_extension $phpenv_version
+        echo "$phpenv_extension is built into shivammathur/php@$phpenv_version and cannot be uninstalled separately"
+        return 1
+    end
+
+    set -l phpenv_formula_name (__phpenv_homebrew_ext_formula_name $phpenv_extension)
+    set -l phpenv_formula "shivammathur/extensions/$phpenv_formula_name@$phpenv_version"
     if brew uninstall $phpenv_formula
         echo "$phpenv_extension@$phpenv_version uninstalled successfully"
         return 0

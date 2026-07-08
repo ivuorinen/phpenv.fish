@@ -138,6 +138,63 @@ end
 popd
 rm -rf $sandbox $empty_sandbox $broken_sandbox
 
+# --- homebrew provider: builtins skipped, tap formula names mapped --------------
+function __phpenv_get_provider
+    echo homebrew
+end
+function __phpenv_provider_homebrew_ensure_source
+    true
+end
+set -g brew_calls
+function brew
+    set -a brew_calls "$argv"
+    true
+end
+
+set brew_calls
+phpenv ext install bcmath >/dev/null
+assert_eq $status 0 "homebrew: builtin bcmath exits 0"
+assert_eq (count $brew_calls) 0 "homebrew: builtin bcmath does not call brew"
+
+set brew_calls
+phpenv ext install redis >/dev/null
+assert_eq $status 0 "homebrew: redis exits 0"
+assert_eq "$brew_calls" "install shivammathur/extensions/phpredis@8.3" \
+    "homebrew: redis maps to phpredis formula"
+
+set brew_calls
+phpenv ext install laravel >/dev/null
+assert_eq $status 0 "homebrew: laravel preset exits 0"
+assert_eq (count $brew_calls) 10 "homebrew: laravel preset installs only the 10 tap extensions"
+if string match -q "*phpredis@8.3*" "$brew_calls"; and not string match -q "*bcmath*" "$brew_calls"
+    echo "ok   homebrew: laravel preset skips builtins, installs tap formulas"
+else
+    echo "FAIL homebrew: unexpected brew calls: $brew_calls"
+    set -g test_failures (math $test_failures + 1)
+end
+
+set brew_calls
+phpenv ext uninstall bcmath >/dev/null
+assert_eq $status 1 "homebrew: uninstalling builtin exits 1"
+assert_eq (count $brew_calls) 0 "homebrew: uninstalling builtin does not call brew"
+
+set brew_calls
+phpenv ext install http >/dev/null
+assert_eq "$brew_calls" "install shivammathur/extensions/pecl_http@8.3" \
+    "homebrew: http maps to pecl_http formula"
+
+# pspell is builtin only until 8.3 (left core PHP in 8.4)
+set brew_calls
+phpenv ext install pspell >/dev/null
+assert_eq $status 0 "homebrew: pspell builtin on 8.3 exits 0"
+assert_eq (count $brew_calls) 0 "homebrew: pspell builtin on 8.3 does not call brew"
+set -g PHPENV_VERSION_OVERRIDE 8.4
+set brew_calls
+phpenv ext install pspell >/dev/null
+assert_eq "$brew_calls" "install shivammathur/extensions/pspell@8.4" \
+    "homebrew: pspell on 8.4 is not builtin, brew attempted"
+set -e PHPENV_VERSION_OVERRIDE
+
 if test $test_failures -gt 0
     echo "$test_failures test(s) failed"
     exit 1
