@@ -109,6 +109,11 @@ phpenv doctor
 - `phpenv extensions install laravel` - Install the extension set used by [Laravel Sail](https://github.com/laravel/sail)
 - `phpenv extensions install from-composer` - Install `ext-*` requirements from the nearest composer.json
 - `phpenv extensions uninstall <ext> [ext ...]` - Uninstall one or more extensions
+
+On Homebrew, extensions compiled into the shivammathur/php builds (bcmath, curl, gd, intl,
+mbstring, xml, zip, ...) are skipped automatically — only PECL extensions (xdebug, redis,
+imagick, ...) are installed from the shivammathur/extensions tap.
+
 - `phpenv extensions list` - List installed extensions
 - `phpenv extensions available` - Show available extensions
 

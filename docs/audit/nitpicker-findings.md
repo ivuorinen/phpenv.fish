@@ -1,7 +1,7 @@
 # Nitpicker Findings
 
 Generated: 2026-07-04
-Last validated: 2026-07-04
+Last validated: 2026-07-08
 
 Pass 1 scope: version detection/resolution (composer.json, version files, aliases).
 Pass 2 scope: whole repository — providers, PATH management, config system,
@@ -9,10 +9,12 @@ completions, conf.d, Fisher packaging, CI, docs.
 Pass 4 scope: re-review of pass 2/3 fixes plus repo config; pre-commit all-files run (green).
 Pass 5 scope: documentation accuracy — README, CONTRIBUTING, CLAUDE.md, help text.
 Pass 6 scope: workflow security — zizmor --persona auditor.
+Pass 7 scope: changed-files — homebrew builtin-extension skip, tap formula-name
+mapping, laravel preset brew-side fix (uncommitted work).
 
 ## Summary
 
-- Total: 30 | Open: 0 | Fixed: 30 | Invalid: 0
+- Total: 32 | Open: 0 | Fixed: 32 | Invalid: 0
 
 ## Open Findings
 
@@ -245,6 +247,30 @@ explanatory comment; codeql and stale gained concurrency limits; sync-labels che
 `persist-credentials: false` and drops its redundant token input. One documented exception:
 pr-lint's checkout keeps `persist-credentials: true` (the action pushes autofix commits) with
 an inline `zizmor: ignore[artipacked]`. Result: zero live findings, one ignored.
+
+### Pass 7 — 2026-07-08
+
+#### [NIT-31] pspell falsely reported as builtin for PHP >= 8.4
+
+Fixed: 2026-07-08
+Notes: Medium. pspell left core PHP in 8.4 and shivammathur/extensions has no pspell
+formula, but the static builtin list made `phpenv ext install pspell` on PHP >= 8.4
+print "built into shivammathur/php, nothing to install" and exit 0 — a false success.
+Verified against php@8.1/8.4 and unversioned php (8.5) formula configure flags
+(`--with-pspell` present only <= 8.3). Builtin check extracted into
+`__phpenv_homebrew_ext_is_builtin` with a version-enumerated pspell case (closed set:
+5.6-8.3). Tests cover both sides (8.3 skip, 8.4 brew attempt).
+
+#### [NIT-32] Tap formula-name mapping missed pecl_http
+
+Fixed: 2026-07-08
+Notes: Low. Same defect class as the redis->phpredis fix under review: PECL `http` is
+packaged as `pecl_http` in shivammathur/extensions, so `phpenv ext install http` (or
+composer `ext-http` via from-composer) failed against a nonexistent `http@<ver>`
+formula. Scanned all 746 tap formulas: phpredis and pecl_http are the only two
+PECL-name mismatches (mongodb1/phalcon3-5/xdebug2/imap-uw are versioned or alternate
+variants, not name changes). Added `http` case to `__phpenv_homebrew_ext_formula_name`
+with a test.
 
 ## Invalid
 
