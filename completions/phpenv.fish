@@ -113,10 +113,16 @@ complete -c phpenv -f \
     -n "not __fish_seen_subcommand_from install uninstall remove list ls available" \
     -a "available" -d "Show available extensions"
 
-# Complete extension names
+# Complete extension names and install shortcuts
 complete -c phpenv -f \
     -n "__fish_seen_subcommand_from extensions ext; and __fish_seen_subcommand_from install" \
     -a "(__phpenv_complete_extensions)" -d "PHP extension"
+complete -c phpenv -f \
+    -n "__fish_seen_subcommand_from extensions ext; and __fish_seen_subcommand_from install" \
+    -a "laravel" -d "Extensions used by Laravel Sail"
+complete -c phpenv -f \
+    -n "__fish_seen_subcommand_from extensions ext; and __fish_seen_subcommand_from install" \
+    -a "from-composer" -d "ext-* requirements from composer.json"
 
 # Complete help options
 complete -c phpenv -f -s h -l help -d "Show help"
