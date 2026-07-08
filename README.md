@@ -76,8 +76,7 @@ phpenv global 8.3
 phpenv local 8.1
 
 # Install extensions
-phpenv extensions install xdebug
-phpenv extensions install redis
+phpenv extensions install xdebug redis
 
 # Configure behavior
 phpenv config set auto-switch false  # Disable auto-switching
@@ -102,8 +101,8 @@ phpenv doctor
 
 ### Extension Management
 
-- `phpenv extensions install <ext>` - Install extension for current PHP
-- `phpenv extensions uninstall <ext>` - Uninstall extension
+- `phpenv extensions install <ext> [ext ...]` - Install one or more extensions for current PHP
+- `phpenv extensions uninstall <ext> [ext ...]` - Uninstall one or more extensions
 - `phpenv extensions list` - List installed extensions
 - `phpenv extensions available` - Show available extensions
 

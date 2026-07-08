@@ -38,4 +38,6 @@ jobs:
           fish -n completions/phpenv.fish
 
       - name: Run tests
-        run: fish tests/version-detection.fish
+        run: |
+          fish tests/version-detection.fish
+          fish tests/extensions.fish
