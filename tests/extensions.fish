@@ -118,10 +118,25 @@ popd
 # --- from-composer without composer.json ---------------------------------------
 set -l empty_sandbox (mktemp -d)
 pushd $empty_sandbox
-phpenv ext install from-composer >/dev/null
+set -l err (phpenv ext install from-composer 2>&1 >/dev/null)
 assert_eq $status 1 "from-composer without composer.json exits 1"
+assert_eq "$err" "No composer.json found" "missing composer.json reported on stderr"
 popd
-rm -rf $sandbox $empty_sandbox
+
+# --- from-composer with malformed composer.json ---------------------------------
+set -l broken_sandbox (mktemp -d)
+echo 'not json{' >$broken_sandbox/composer.json
+pushd $broken_sandbox
+set -l err (phpenv ext install from-composer 2>&1 >/dev/null)
+assert_eq $status 1 "from-composer with malformed composer.json exits 1"
+if string match -q "Failed to parse *" "$err"
+    echo "ok   parse failure reported on stderr"
+else
+    echo "FAIL parse failure message: got '$err'"
+    set -g test_failures (math $test_failures + 1)
+end
+popd
+rm -rf $sandbox $empty_sandbox $broken_sandbox
 
 if test $test_failures -gt 0
     echo "$test_failures test(s) failed"

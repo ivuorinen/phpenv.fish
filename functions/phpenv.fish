@@ -1488,15 +1488,23 @@ set -g __phpenv_preset_laravel bcmath curl gd igbinary imagick imap intl ldap mb
     memcached mongodb msgpack mysql pcov pgsql redis soap sqlite3 swoole xdebug xml zip
 
 # Print ext-* requirements from the nearest composer.json (require + require-dev),
-# mapped to provider package names. Returns 1 if no composer.json is found.
+# mapped to provider package names. Stays silent on errors because callers run it
+# in a command substitution (fish routes nested-substitution stderr straight to the
+# session tty, bypassing caller redirections): returns 1 if no composer.json is
+# found, 2 if it cannot be parsed; the caller reports.
 function __phpenv_composer_required_extensions
     set -l phpenv_composer_file (__phpenv_find_version_file composer.json)
     if test -z "$phpenv_composer_file"
         return 1
     end
 
-    for phpenv_ext in (jq -r '((.require // {}) + (."require-dev" // {}))
+    set -l phpenv_composer_exts (jq -r '((.require // {}) + (."require-dev" // {}))
             | keys[] | select(startswith("ext-")) | ltrimstr("ext-")' "$phpenv_composer_file" 2>/dev/null)
+    if test $status -ne 0
+        return 2
+    end
+
+    for phpenv_ext in $phpenv_composer_exts
         switch $phpenv_ext
             # Bundled with every PHP the providers ship; nothing to install
             case json ctype filter hash openssl pcre session spl tokenizer fileinfo iconv phar posix pdo sodium
@@ -1530,9 +1538,13 @@ function __phpenv_extensions_install
                 set -a phpenv_extensions $__phpenv_preset_laravel
             case from-composer
                 set -l phpenv_composer_exts (__phpenv_composer_required_extensions)
-                if test $status -ne 0
-                    echo "No composer.json found"
-                    return 1
+                switch $status
+                    case 1
+                        echo "No composer.json found" >&2
+                        return 1
+                    case 2
+                        echo "Failed to parse composer.json" >&2
+                        return 1
                 end
                 if test (count $phpenv_composer_exts) -eq 0
                     echo "No ext-* requirements found in composer.json"
