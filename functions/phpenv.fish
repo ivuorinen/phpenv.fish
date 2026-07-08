@@ -1465,25 +1465,25 @@ function __phpenv_config_list
     __phpenv_config_get default-extensions --verbose
 end
 
-function __phpenv_extensions -a phpenv_action phpenv_extension
+function __phpenv_extensions -a phpenv_action
     switch $phpenv_action
         case install
-            __phpenv_extensions_install $phpenv_extension
+            __phpenv_extensions_install $argv[2..]
         case uninstall remove
-            __phpenv_extensions_uninstall $phpenv_extension
+            __phpenv_extensions_uninstall $argv[2..]
         case list ls
             __phpenv_extensions_list
         case available
             __phpenv_extensions_available
         case '*'
-            echo "Usage: phpenv extensions {install|uninstall|list|available} [extension]"
+            echo "Usage: phpenv extensions {install|uninstall|list|available} [extension ...]"
             return 1
     end
 end
 
-function __phpenv_extensions_install -a phpenv_extension
-    if test -z "$phpenv_extension"
-        echo "Usage: phpenv extensions install <extension>"
+function __phpenv_extensions_install
+    if test (count $argv) -eq 0
+        echo "Usage: phpenv extensions install <extension> [extension ...]"
         return 1
     end
 
@@ -1499,24 +1499,37 @@ function __phpenv_extensions_install -a phpenv_extension
         return 1
     end
 
-    echo "Installing $phpenv_extension for PHP $phpenv_version..."
-
     set -l provider (__phpenv_get_provider)
+    if not contains -- $provider homebrew apt
+        echo "Unknown provider: $provider"
+        return 1
+    end
 
-    switch $provider
-        case homebrew
-            __phpenv_provider_homebrew_ext_install $phpenv_extension $phpenv_version
-        case apt
-            __phpenv_provider_apt_ext_install $phpenv_extension $phpenv_version
-        case '*'
-            echo "Unknown provider: $provider"
-            return 1
+    set -l phpenv_failed
+    for phpenv_extension in $argv
+        echo "Installing $phpenv_extension for PHP $phpenv_version..."
+
+        switch $provider
+            case homebrew
+                __phpenv_provider_homebrew_ext_install $phpenv_extension $phpenv_version
+            case apt
+                __phpenv_provider_apt_ext_install $phpenv_extension $phpenv_version
+        end
+
+        if test $status -ne 0
+            set -a phpenv_failed $phpenv_extension
+        end
+    end
+
+    if test (count $phpenv_failed) -gt 0
+        echo "Failed to install: "(string join ", " $phpenv_failed)
+        return 1
     end
 end
 
-function __phpenv_extensions_uninstall -a phpenv_extension
-    if test -z "$phpenv_extension"
-        echo "Usage: phpenv extensions uninstall <extension>"
+function __phpenv_extensions_uninstall
+    if test (count $argv) -eq 0
+        echo "Usage: phpenv extensions uninstall <extension> [extension ...]"
         return 1
     end
 
@@ -1527,15 +1540,28 @@ function __phpenv_extensions_uninstall -a phpenv_extension
     end
 
     set -l provider (__phpenv_get_provider)
+    if not contains -- $provider homebrew apt
+        echo "Unknown provider: $provider"
+        return 1
+    end
 
-    switch $provider
-        case homebrew
-            __phpenv_provider_homebrew_ext_uninstall $phpenv_extension $phpenv_version
-        case apt
-            __phpenv_provider_apt_ext_uninstall $phpenv_extension $phpenv_version
-        case '*'
-            echo "Unknown provider: $provider"
-            return 1
+    set -l phpenv_failed
+    for phpenv_extension in $argv
+        switch $provider
+            case homebrew
+                __phpenv_provider_homebrew_ext_uninstall $phpenv_extension $phpenv_version
+            case apt
+                __phpenv_provider_apt_ext_uninstall $phpenv_extension $phpenv_version
+        end
+
+        if test $status -ne 0
+            set -a phpenv_failed $phpenv_extension
+        end
+    end
+
+    if test (count $phpenv_failed) -gt 0
+        echo "Failed to uninstall: "(string join ", " $phpenv_failed)
+        return 1
     end
 end
 
