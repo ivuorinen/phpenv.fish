@@ -78,6 +78,10 @@ phpenv local 8.1
 # Install extensions
 phpenv extensions install xdebug redis
 
+# Install extension sets
+phpenv extensions install laravel        # extensions used by Laravel Sail
+phpenv extensions install from-composer  # ext-* requirements from composer.json
+
 # Configure behavior
 phpenv config set auto-switch false  # Disable auto-switching
 phpenv config set auto-install true  # Enable auto-installation
@@ -102,6 +106,8 @@ phpenv doctor
 ### Extension Management
 
 - `phpenv extensions install <ext> [ext ...]` - Install one or more extensions for current PHP
+- `phpenv extensions install laravel` - Install the extension set used by [Laravel Sail](https://github.com/laravel/sail)
+- `phpenv extensions install from-composer` - Install `ext-*` requirements from the nearest composer.json
 - `phpenv extensions uninstall <ext> [ext ...]` - Uninstall one or more extensions
 - `phpenv extensions list` - List installed extensions
 - `phpenv extensions available` - Show available extensions

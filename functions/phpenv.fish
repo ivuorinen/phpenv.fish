@@ -1481,10 +1481,84 @@ function __phpenv_extensions -a phpenv_action
     end
 end
 
+# Extension set from laravel/sail runtimes/<ver>/Dockerfile (identical for 8.0-8.5),
+# minus non-extension packages (cli, dev, readline). Single shared list;
+# split per PHP version if sail's runtimes ever diverge.
+set -g __phpenv_preset_laravel bcmath curl gd igbinary imagick imap intl ldap mbstring \
+    memcached mongodb msgpack mysql pcov pgsql redis soap sqlite3 swoole xdebug xml zip
+
+# Print ext-* requirements from the nearest composer.json (require + require-dev),
+# mapped to provider package names. Stays silent on errors because callers run it
+# in a command substitution (fish routes nested-substitution stderr straight to the
+# session tty, bypassing caller redirections): returns 1 if no composer.json is
+# found, 2 if it cannot be parsed; the caller reports.
+function __phpenv_composer_required_extensions
+    set -l phpenv_composer_file (__phpenv_find_version_file composer.json)
+    if test -z "$phpenv_composer_file"
+        return 1
+    end
+
+    set -l phpenv_composer_exts (jq -r '((.require // {}) + (."require-dev" // {}))
+            | keys[] | select(startswith("ext-")) | ltrimstr("ext-")' "$phpenv_composer_file" 2>/dev/null)
+    if test $status -ne 0
+        return 2
+    end
+
+    for phpenv_ext in $phpenv_composer_exts
+        switch $phpenv_ext
+            # Bundled with every PHP the providers ship; nothing to install
+            case json ctype filter hash openssl pcre session spl tokenizer fileinfo iconv phar posix pdo sodium
+                continue
+            # Provider packages bundle these under a different name
+            case dom simplexml xmlreader xmlwriter
+                echo xml
+            case mysqli pdo_mysql
+                echo mysql
+            case pdo_pgsql
+                echo pgsql
+            case pdo_sqlite
+                echo sqlite3
+            case '*'
+                echo $phpenv_ext
+        end
+    end
+end
+
 function __phpenv_extensions_install
     if test (count $argv) -eq 0
-        echo "Usage: phpenv extensions install <extension> [extension ...]"
+        echo "Usage: phpenv extensions install <extension|laravel|from-composer> [extension ...]"
         return 1
+    end
+
+    # Expand shortcuts (framework presets, composer.json scan) and dedupe
+    set -l phpenv_extensions
+    for phpenv_arg in $argv
+        switch $phpenv_arg
+            case laravel
+                set -a phpenv_extensions $__phpenv_preset_laravel
+            case from-composer
+                set -l phpenv_composer_exts (__phpenv_composer_required_extensions)
+                switch $status
+                    case 1
+                        echo "No composer.json found" >&2
+                        return 1
+                    case 2
+                        echo "Failed to parse composer.json" >&2
+                        return 1
+                end
+                if test (count $phpenv_composer_exts) -eq 0
+                    echo "No ext-* requirements found in composer.json"
+                    continue
+                end
+                set -a phpenv_extensions $phpenv_composer_exts
+            case '*'
+                set -a phpenv_extensions $phpenv_arg
+        end
+    end
+    set phpenv_extensions (printf '%s\n' $phpenv_extensions | awk '!seen[$0]++')
+    if test (count $phpenv_extensions) -eq 0
+        echo "Nothing to install"
+        return 0
     end
 
     # Check for version override first (from environment, not global variable)
@@ -1506,7 +1580,7 @@ function __phpenv_extensions_install
     end
 
     set -l phpenv_failed
-    for phpenv_extension in $argv
+    for phpenv_extension in $phpenv_extensions
         echo "Installing $phpenv_extension for PHP $phpenv_version..."
 
         switch $provider
@@ -1725,6 +1799,8 @@ function __phpenv_help
     echo "  doctor                  Check phpenv installation and provider"
     echo "  config <action>         Manage configuration"
     echo "  extensions <action>     Manage PHP extensions"
+    echo "                          install shortcuts: 'laravel' (Laravel Sail set),"
+    echo "                          'from-composer' (ext-* from composer.json)"
     echo "  help                    Show this help"
     echo ""
     echo "Version sources (in order of priority):"
