@@ -317,7 +317,7 @@ pip install pre-commit
 pre-commit install
 
 # Run the test suite
-fish tests/version-detection.fish
+for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t"; done
 ```
 
 ## Performance Optimizations

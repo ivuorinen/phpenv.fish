@@ -3,20 +3,12 @@
 # Run: fish tests/extensions.fish
 
 set -l repo_root (dirname (status dirname))
+source $repo_root/tests/helpers.fish
 source $repo_root/functions/phpenv.fish
 
 # Keep the PWD event handler quiet while the test runs
 set -g PHPENV_AUTO_SWITCH false
 set -g test_failures 0
-
-function assert_eq -a actual expected label
-    if test "$actual" = "$expected"
-        echo "ok   $label"
-    else
-        echo "FAIL $label: expected '$expected', got '$actual'"
-        set -g test_failures (math $test_failures + 1)
-    end
-end
 
 # --- provider stubs: record calls, fail on 'badext' -------------------------
 function __phpenv_get_provider

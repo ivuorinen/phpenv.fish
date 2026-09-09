@@ -3,20 +3,12 @@
 # Run: fish tests/version-detection.fish
 
 set -l repo_root (dirname (status dirname))
+source $repo_root/tests/helpers.fish
 source $repo_root/functions/phpenv.fish
 
 # Keep the PWD event handler quiet while the test cds around
 set -g PHPENV_AUTO_SWITCH false
 set -g test_failures 0
-
-function assert_eq -a actual expected label
-    if test "$actual" = "$expected"
-        echo "ok   $label"
-    else
-        echo "FAIL $label: expected '$expected', got '$actual'"
-        set -g test_failures (math $test_failures + 1)
-    end
-end
 
 # --- __phpenv_normalize_version -------------------------------------------
 assert_eq (__phpenv_normalize_version 8.1.12) 8.1 "normalize 8.1.12 -> 8.1"
@@ -56,6 +48,43 @@ else
     set -g test_failures (math $test_failures + 1)
 end
 assert_eq (__phpenv_parse_semver_constraint '7.x') 7.4 "constraint 7.x -> 7.4"
+
+# MINOR-pinning wildcards must not fall into the '8.*'/'7.*' latest globs
+assert_eq (__phpenv_parse_semver_constraint '8.1.*') 8.1 "constraint 8.1.* -> 8.1"
+assert_eq (__phpenv_parse_semver_constraint '8.1.x') 8.1 "constraint 8.1.x -> 8.1"
+assert_eq (__phpenv_parse_semver_constraint '8.0.*') 8.0 "constraint 8.0.* -> 8.0"
+assert_eq (__phpenv_parse_semver_constraint '7.1.*') 7.1 "constraint 7.1.* -> 7.1"
+
+# A MINOR pin still counts when it is not the whole constraint
+assert_eq (__phpenv_parse_semver_constraint '8.1.* || 8.2.*') 8.1 "compound pin -> first pin"
+assert_eq (__phpenv_parse_semver_constraint '8.1.*@dev') 8.1 "stability suffix -> 8.1"
+assert_eq (__phpenv_parse_semver_constraint '8.1.X') 8.1 "uppercase X wildcard -> 8.1"
+assert_eq (__phpenv_parse_semver_constraint '~8.1.*') 8.1 "tilde with pin -> 8.1"
+# ...but a bare major wildcard still means "latest in the series"
+set -l bare_major (__phpenv_parse_semver_constraint '8.*')
+if string match -rq '^8\.[0-9]+$' $bare_major
+    echo "ok   constraint 8.* -> series latest ($bare_major)"
+else
+    echo "FAIL constraint 8.*: got '$bare_major', not 8.MINOR"
+    set -g test_failures (math $test_failures + 1)
+end
+
+# __phpenv_find_version_file must signal not-found through its exit status:
+# conf.d branches on the status alone to decide whether to initialize PATH
+set -l probe_dir (mktemp -d 2>/dev/null; or mktemp -d -t phpenv-probe)
+pushd $probe_dir
+__phpenv_find_version_file .php-version >/dev/null
+if test $status -eq 0
+    echo "FAIL find_version_file: returned 0 with no version file present"
+    set -g test_failures (math $test_failures + 1)
+else
+    echo "ok   find_version_file signals not-found via exit status"
+end
+echo 8.2 > .php-version
+__phpenv_find_version_file .php-version >/dev/null
+assert_eq $status 0 "find_version_file returns 0 when the file exists"
+popd
+rm -rf $probe_dir
 
 # jq bracket-notation regression: "8.x" is not valid jq path syntax
 set -l field_8x (__phpenv_parse_version_field "8.x" "8.4")
@@ -99,6 +128,45 @@ else if test -f .php-version
 else
     echo "ok   phpenv local banana rejected"
 end
+
+# composer.json that jq cannot parse must fall through, not abort detection
+echo 'not json{' >composer.json
+rm -f .php-version .tool-version .tool-versions
+set -g PHPENV_GLOBAL_VERSION 8.2
+assert_eq (__phpenv_detect_version) 8.2 "malformed composer.json falls through to the global version"
+set -e PHPENV_GLOBAL_VERSION
+
+# composer.json with no php key at all: same fall-through, different cause
+echo '{"require":{"monolog/monolog":"^3.0"}}' >composer.json
+set -g PHPENV_GLOBAL_VERSION 8.2
+assert_eq (__phpenv_detect_version) 8.2 "composer.json without a php key falls through"
+set -e PHPENV_GLOBAL_VERSION
+rm -f composer.json
+
+# --- config set default-extensions rejects invalid input -------------------
+set -g PHPENV_DEFAULT_EXTENSIONS opcache
+__phpenv_config_set default-extensions 'foo;bar rm' >/dev/null 2>&1
+assert_fails $status "config set default-extensions: rejects an invalid list"
+assert_eq "$PHPENV_DEFAULT_EXTENSIONS" opcache \
+    "config set default-extensions: leaves the previous value when rejecting"
+__phpenv_config_set default-extensions 'opcache xdebug redis' >/dev/null
+assert_status $status 0 "config set default-extensions: accepts a valid list"
+assert_eq "$PHPENV_DEFAULT_EXTENSIONS" "opcache xdebug redis" \
+    "config set default-extensions: stores a valid list"
+
+# Surrounding whitespace is a typo, not a syntax error: trim, do not reject
+__phpenv_config_set default-extensions '  opcache xdebug  ' >/dev/null
+assert_status $status 0 "config set default-extensions: trims surrounding whitespace"
+assert_eq "$PHPENV_DEFAULT_EXTENSIONS" "opcache xdebug" \
+    "config set default-extensions: stores the trimmed value"
+
+# A wrong separator is still a real error
+set -g PHPENV_DEFAULT_EXTENSIONS keep
+__phpenv_config_set default-extensions 'opcache,xdebug' >/dev/null 2>&1
+assert_fails $status "config set default-extensions: still rejects comma separators"
+assert_eq "$PHPENV_DEFAULT_EXTENSIONS" keep \
+    "config set default-extensions: comma rejection leaves the value alone"
+set -e PHPENV_DEFAULT_EXTENSIONS
 
 # homebrew: unversioned `php` formula version read from Cellar dirname, not remote JSON
 mkdir -p cellar/php/8.4.9 cellar/php/8.4.11
