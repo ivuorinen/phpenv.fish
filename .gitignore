@@ -132,3 +132,7 @@ Homestead.json
 .env*.local
 .vercel
 next-env.d.ts
+
+# Claude Code per-developer settings. Only the .local.json file: a shared
+# .claude/settings.json or .claude/rules/ added later should stay committable.
+.claude/settings.local.json
