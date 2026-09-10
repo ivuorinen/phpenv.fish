@@ -62,7 +62,7 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
 Run the test suite:
 
 ```bash
-for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t"; done
+(for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
 ```
 
 Then test interactively:
@@ -279,7 +279,7 @@ Use unified helper functions to avoid code duplication:
    ```bash
    pre-commit run --all-files
    fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish
-   for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t"; done
+   (for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
    ```
 
 4. **Test thoroughly**:

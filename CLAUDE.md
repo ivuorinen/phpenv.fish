@@ -14,8 +14,10 @@ It provides fast PHP version switching, extension management, and automatic vers
 Since this is a Fish shell plugin, test changes by:
 
 ```bash
-# Run the test suite (helpers.fish is sourced by the suites, not run as one)
-for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t"; done
+# Run the test suite. helpers.fish is sourced by the suites, not run as one.
+# The subshell makes the first failing suite the exit status: a bare loop
+# reports only its last iteration, so an early failure would look green.
+(for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
 
 # Syntax-check all sources
 fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish

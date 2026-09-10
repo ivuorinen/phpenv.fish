@@ -1361,9 +1361,25 @@ function __phpenv_doctor
 
     # Show provider information
     set -l provider (__phpenv_get_provider)
+    # Report whether the override was actually honored, not merely set:
+    # __phpenv_get_provider rejects an override naming an invalid provider, or
+    # one whose tool is missing, and falls back to auto-detect. Labelling that
+    # "override" produced lines like "Provider: homebrew (PHPENV_PROVIDER
+    # override)" under PHPENV_PROVIDER=apt — crediting one provider while
+    # naming another.
+    #
+    # Read the rejection from the getter's own warning rather than comparing
+    # names: when the override names the provider auto-detect would have picked
+    # anyway, the two are equal even though the override was refused, so an
+    # equality test reports a rejected override as honored.
+    set -l provider_warning (__phpenv_get_provider 2>&1 >/dev/null)
     set -l provider_source "auto-detected"
     if set -q PHPENV_PROVIDER; and test -n "$PHPENV_PROVIDER"
-        set provider_source "PHPENV_PROVIDER override"
+        if test -n "$provider_warning"
+            set provider_source "auto-detected; PHPENV_PROVIDER='$PHPENV_PROVIDER' rejected"
+        else
+            set provider_source "PHPENV_PROVIDER override"
+        end
     end
     echo "Provider: $provider ($provider_source)"
     echo ""
