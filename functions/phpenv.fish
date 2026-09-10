@@ -2,17 +2,23 @@
 # Repository: https://github.com/ivuorinen/phpenv.fish
 
 function phpenv -d "PHP version manager for Fish Shell"
-    if not command -q jq
-        set -l install_cmd "brew install jq"
-        if command -q apt-get
-            set install_cmd "sudo apt-get install jq"
-        end
-        echo "Error: jq is required but not installed. Install with: $install_cmd" >&2
-        return 1
-    end
-
     set -l phpenv_cmd $argv[1]
     set -l phpenv_args $argv[2..]
+
+    # Only the commands that parse composer.json or the remote version JSON
+    # need jq. Gating `doctor` on it made the diagnostic unavailable in the
+    # one case it exists to report, leaving its own "jq is not installed"
+    # branch unreachable; `help` is where the install hint lives.
+    if not contains -- "$phpenv_cmd" doctor help -h --help ""
+        if not command -q jq
+            set -l install_cmd "brew install jq"
+            if command -q apt-get
+                set install_cmd "sudo apt-get install jq"
+            end
+            echo "Error: jq is required but not installed. Install with: $install_cmd" >&2
+            return 1
+        end
+    end
 
     switch $phpenv_cmd
         case install
@@ -105,15 +111,26 @@ function __phpenv_detect_version
     end
 end
 
+# Walk upward from the cwd, printing the first match. Signals "not found"
+# through the exit status as well as empty output: conf.d branches on the
+# status alone, and without the explicit `return 1` the loop falls through
+# with status 0, silently disabling startup PATH initialization.
 function __phpenv_find_version_file -a phpenv_filename
     set -l phpenv_dir (pwd)
     while test "$phpenv_dir" != "/"
         if test -f "$phpenv_dir/$phpenv_filename"
             echo "$phpenv_dir/$phpenv_filename"
-            return
+            return 0
         end
         set phpenv_dir (dirname $phpenv_dir)
     end
+    # The loop stops before testing "/" itself; check it so a version file
+    # at the filesystem root is not invisible.
+    if test -f "/$phpenv_filename"
+        echo "/$phpenv_filename"
+        return 0
+    end
+    return 1
 end
 
 function __phpenv_parse_tool_version -a phpenv_file
@@ -145,14 +162,19 @@ function __phpenv_parse_composer_version -a phpenv_composer_file
         return
     end
 
+    # Emptiness is the only usable signal here. `set` resets $status to its own
+    # result, so a `test $status -eq 0` after the assignment always sees 0 and
+    # cannot tell a jq failure from an absent key; `// empty` yields "" rather
+    # than the literal "null", so a != "null" guard never fires either. Both
+    # cases land as an empty variable and fall through to the next source.
     set -l phpenv_platform_php (jq -r '.config.platform.php // empty' "$phpenv_composer_file" 2>/dev/null)
-    if test $status -eq 0 -a -n "$phpenv_platform_php" -a "$phpenv_platform_php" != "null"
+    if test -n "$phpenv_platform_php"
         __phpenv_normalize_version $phpenv_platform_php
         return
     end
 
     set -l phpenv_require_php (jq -r '.require.php // empty' "$phpenv_composer_file" 2>/dev/null)
-    if test $status -eq 0 -a -n "$phpenv_require_php" -a "$phpenv_require_php" != "null"
+    if test -n "$phpenv_require_php"
         __phpenv_parse_semver_constraint $phpenv_require_php
         return
     end
@@ -165,6 +187,16 @@ function __phpenv_parse_semver_constraint -a phpenv_constraint
     # Must run before the switch: fish globs like '8.*' would swallow it.
     if string match -rq '^v?[0-9]+(\.[0-9]+)+$' -- $phpenv_constraint
         __phpenv_normalize_version $phpenv_constraint
+        return
+    end
+
+    # A MINOR pin anywhere in the constraint wins over the '8.*' glob below.
+    # Matching the whole string is not enough: "8.1.* || 8.2.*" and "8.1.*@dev"
+    # also pin a MINOR, and the glob resolved them to the 8.x latest — a version
+    # that satisfies neither branch. The first pinned MAJOR.MINOR is always
+    # inside the allowed set; the series latest need not be.
+    if string match -rq '[0-9]+\.[0-9]+\.[*xX]' -- $phpenv_constraint
+        __phpenv_normalize_version (string match -r '[0-9]+\.[0-9]+' -- $phpenv_constraint)[1]
         return
     end
 
@@ -260,13 +292,21 @@ end
 # Detect and return the active provider name
 # Priority: PHPENV_PROVIDER override > macOS (homebrew) > Linux+apt+ondrej (apt) > Linux+brew (homebrew)
 function __phpenv_get_provider
-    # Check for user override
+    # Check for user override. Both the name and the backing tool are
+    # validated: accepting an override for a provider this machine cannot run
+    # pushed the failure down into every command, where it surfaced as a
+    # provider-flavoured error ("apt-get is not available") rather than as
+    # "you asked for a provider that is not here".
     if set -q PHPENV_PROVIDER; and test -n "$PHPENV_PROVIDER"
-        if contains $PHPENV_PROVIDER homebrew apt
+        if not contains $PHPENV_PROVIDER homebrew apt
+            echo "Warning: Invalid PHPENV_PROVIDER '$PHPENV_PROVIDER', using auto-detect" >&2
+        else if test "$PHPENV_PROVIDER" = homebrew; and not command -q brew
+            echo "Warning: PHPENV_PROVIDER is 'homebrew' but brew is not installed; using auto-detect" >&2
+        else if test "$PHPENV_PROVIDER" = apt; and not command -q apt-get
+            echo "Warning: PHPENV_PROVIDER is 'apt' but apt-get is not installed; using auto-detect" >&2
+        else
             echo $PHPENV_PROVIDER
             return 0
-        else
-            echo "Warning: Invalid PHPENV_PROVIDER '$PHPENV_PROVIDER', using auto-detect" >&2
         end
     end
 
@@ -302,25 +342,9 @@ function __phpenv_get_provider
     return 0
 end
 
-# Check if a provider is available on this system
-function __phpenv_provider_available -a provider
-    switch $provider
-        case homebrew
-            command -q brew
-        case apt
-            command -q apt-get
-        case '*'
-            return 1
-    end
-end
-
 # =============================================================================
 # HOMEBREW PROVIDER
 # =============================================================================
-
-function __phpenv_provider_homebrew_detect
-    command -q brew
-end
 
 function __phpenv_provider_homebrew_ensure_source
     if not command -q brew
@@ -599,10 +623,6 @@ function __phpenv_validate_apt_input -a input
     string match -rq '^[a-zA-Z0-9.-]+$' $input
 end
 
-function __phpenv_provider_apt_detect
-    command -q apt-get
-end
-
 function __phpenv_provider_apt_ensure_source
     if not command -q apt-get
         echo "Error: apt-get is not available" >&2
@@ -676,14 +696,17 @@ function __phpenv_provider_apt_get_php_path -a phpenv_version
 
     set -l shim_dir (__phpenv_get_shim_dir)
 
-    # Ensure shim directory exists
-    if not test -d "$shim_dir"
-        mkdir -p "$shim_dir"
-    end
-
     # Check if the PHP version is installed
     if not test -x "/usr/bin/php$phpenv_version"
         return 1
+    end
+
+    # Create the shim directory only once there is something to put in it:
+    # creating it on the failure path left an empty shims dir behind for a
+    # version that was never installed, which doctor then reported as
+    # "✓ Shim directory exists".
+    if not test -d "$shim_dir"
+        mkdir -p "$shim_dir"
     end
 
     # Create/update symlinks for PHP binaries using atomic operation
@@ -915,19 +938,6 @@ end
 # =============================================================================
 # DISPATCHER FUNCTIONS (call provider-specific implementations)
 # =============================================================================
-
-function __phpenv_ensure_source
-    set -l provider (__phpenv_get_provider)
-    switch $provider
-        case homebrew
-            __phpenv_provider_homebrew_ensure_source
-        case apt
-            __phpenv_provider_apt_ensure_source
-        case '*'
-            echo "Unknown provider: $provider" >&2
-            return 1
-    end
-end
 
 function __phpenv_get_php_path -a phpenv_version
     set -l provider (__phpenv_get_provider)
@@ -1188,9 +1198,13 @@ end
 function __phpenv_use
     set -l phpenv_version $argv[1]
 
-    # Handle special case: restore system PHP
+    # Handle special case: restore system PHP. Propagate the helper's status
+    # instead of always reporting success: with no PHPENV_ORIGINAL_PATH stored
+    # it prints its own diagnostic and returns 1, and claiming "Restored"
+    # anyway left callers treating a no-op as a completed restore.
     if test "$phpenv_version" = "system"
         __phpenv_restore_system_path
+        or return 1
         echo "Restored system PHP"
         return 0
     end
@@ -1347,9 +1361,25 @@ function __phpenv_doctor
 
     # Show provider information
     set -l provider (__phpenv_get_provider)
+    # Report whether the override was actually honored, not merely set:
+    # __phpenv_get_provider rejects an override naming an invalid provider, or
+    # one whose tool is missing, and falls back to auto-detect. Labelling that
+    # "override" produced lines like "Provider: homebrew (PHPENV_PROVIDER
+    # override)" under PHPENV_PROVIDER=apt — crediting one provider while
+    # naming another.
+    #
+    # Read the rejection from the getter's own warning rather than comparing
+    # names: when the override names the provider auto-detect would have picked
+    # anyway, the two are equal even though the override was refused, so an
+    # equality test reports a rejected override as honored.
+    set -l provider_warning (__phpenv_get_provider 2>&1 >/dev/null)
     set -l provider_source "auto-detected"
     if set -q PHPENV_PROVIDER; and test -n "$PHPENV_PROVIDER"
-        set provider_source "PHPENV_PROVIDER override"
+        if test -n "$provider_warning"
+            set provider_source "auto-detected; PHPENV_PROVIDER='$PHPENV_PROVIDER' rejected"
+        else
+            set provider_source "PHPENV_PROVIDER override"
+        end
     end
     echo "Provider: $provider ($provider_source)"
     echo ""
@@ -1483,12 +1513,22 @@ function __phpenv_config_set -a phpenv_key phpenv_value
                 return 1
             end
         case default-extensions
-            if __phpenv_validate_extensions $phpenv_value
-                set -g PHPENV_DEFAULT_EXTENSIONS $phpenv_value
-            else
-                echo "Warning: Some extensions may not be available for all PHP versions"
-                set -g PHPENV_DEFAULT_EXTENSIONS $phpenv_value
+            # Reject rather than warn-and-store: the old branch set the value
+            # either way, so an invalid list was reported as "Set
+            # default-extensions = ..." and only failed later, one extension at
+            # a time, during install.
+            #
+            # Trim first: the validator anchors at both ends, so a stray
+            # leading or trailing space would otherwise be refused with a
+            # message about name syntax, which is not what is wrong. Internal
+            # spacing and genuinely bad separators (commas) still fail.
+            set phpenv_value (string trim -- "$phpenv_value")
+            if not __phpenv_validate_extensions $phpenv_value
+                echo "Invalid extension list: $phpenv_value"
+                echo "Use a space-separated list of names ([a-zA-Z0-9_-])"
+                return 1
             end
+            set -g PHPENV_DEFAULT_EXTENSIONS $phpenv_value
         case '*'
             echo "Unknown config key: $phpenv_key"
             echo "Available keys: global-version, auto-install, auto-install-extensions, auto-switch,"

@@ -23,4 +23,4 @@ jobs:
       issues: write # label and close stale issues
       pull-requests: write # label and close stale PRs
     steps:
-      - uses: ivuorinen/actions/stale@de31e11dda6488eabe95e951ebb61c6d9d500865 # v2026.06.30
+      - uses: ivuorinen/actions/stale@7ad79268dba5d86a7ec07512519b9d985c5ef208 # v2026.09.08

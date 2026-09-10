@@ -38,4 +38,4 @@ jobs:
         with:
           persist-credentials: false
       - name: ⤵️ Sync Latest Labels Definitions
-        uses: ivuorinen/actions/sync-labels@de31e11dda6488eabe95e951ebb61c6d9d500865 # v2026.06.30
+        uses: ivuorinen/actions/sync-labels@7ad79268dba5d86a7ec07512519b9d985c5ef208 # v2026.09.08

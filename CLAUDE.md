@@ -13,9 +13,13 @@ It provides fast PHP version switching, extension management, and automatic vers
 
 Since this is a Fish shell plugin, test changes by:
 
+`helpers.fish` is sourced by the suites, not run as one, so the loop skips it.
+The subshell makes the first failing suite the exit status — a bare loop reports
+only its last iteration, so an early failure would look green.
+
 ```bash
 # Run the test suite
-fish tests/version-detection.fish
+(for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
 
 # Syntax-check all sources
 fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish
@@ -144,7 +148,11 @@ the current directory (composer.json included).
 #### Unified Helper Functions
 
 - `__phpenv_parse_version_field`: Single function for all jq parsing (eliminates 9+ duplicated calls)
-- `__phpenv_ensure_source`: Unified provider source management (Homebrew taps / apt PPA)
+- Provider source management is provider-local: `__phpenv_provider_homebrew_ensure_source`
+  (taps) and `__phpenv_provider_apt_ensure_source` (PPA) are called directly from the
+  provider's own install/doctor functions, which already know their provider. Dispatchers
+  (`__phpenv_get_php_path`, `__phpenv_is_version_installed`, ...) exist only for the generic
+  callers that do not.
 - `__phpenv_get_available_extensions`: Shared extension listing logic
 
 ### PATH Management Best Practices

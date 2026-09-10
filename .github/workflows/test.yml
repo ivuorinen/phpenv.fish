@@ -38,6 +38,10 @@ jobs:
           fish -n completions/phpenv.fish
 
       - name: Run tests
+        # helpers.fish is sourced by the suites, not run as one
         run: |
-          fish tests/version-detection.fish
-          fish tests/extensions.fish
+          for t in tests/*.fish; do
+            [ "$t" = "tests/helpers.fish" ] && continue
+            echo "== $t"
+            fish "$t" || exit 1
+          done

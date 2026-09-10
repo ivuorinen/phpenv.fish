@@ -316,8 +316,8 @@ ln -sf $PWD/conf.d/phpenv.fish ~/.config/fish/conf.d/phpenv.fish
 pip install pre-commit
 pre-commit install
 
-# Run the test suite
-fish tests/version-detection.fish
+# Run the test suite (subshell so the first failing suite sets the exit status)
+(for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
 ```
 
 ## Performance Optimizations

@@ -62,7 +62,7 @@ Thank you for your interest in contributing to phpenv.fish! This document provid
 Run the test suite:
 
 ```bash
-fish tests/version-detection.fish
+(for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
 ```
 
 Then test interactively:
@@ -252,7 +252,11 @@ The codebase uses intelligent caching:
 Use unified helper functions to avoid code duplication:
 
 - `__phpenv_parse_version_field`: Single function for all jq parsing
-- `__phpenv_ensure_source`: Unified provider source management (Homebrew taps / apt PPA)
+- Provider source management is provider-local: `__phpenv_provider_homebrew_ensure_source`
+  (taps) and `__phpenv_provider_apt_ensure_source` (PPA) are called directly from the
+  provider's own install/doctor functions, which already know their provider. Dispatchers
+  (`__phpenv_get_php_path`, `__phpenv_is_version_installed`, ...) exist only for the generic
+  callers that do not.
 - `__phpenv_get_tap_formulas`: Shared formula listing logic
 
 ## Submitting Changes
@@ -275,7 +279,7 @@ Use unified helper functions to avoid code duplication:
    ```bash
    pre-commit run --all-files
    fish -n functions/phpenv.fish conf.d/phpenv.fish completions/phpenv.fish
-   fish tests/version-detection.fish
+   (for t in tests/*.fish; do [ "$t" = tests/helpers.fish ] || fish "$t" || exit 1; done)
    ```
 
 4. **Test thoroughly**:
