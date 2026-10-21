@@ -239,23 +239,35 @@ function __phpenv_get_version_info
     set -l current_time (date +%s)
     set -l cache_duration 300  # 5 minutes
 
-    # Return cached version if still valid
+    # Return cached version if still valid. A failed fetch is cached as the
+    # "unavailable" marker (never valid JSON), which prints nothing so callers
+    # take their fallback without refetching on every directory change.
     if test -n "$__phpenv_version_cache"
         set -l cache_age (math $current_time - $__phpenv_version_cache_time)
         if test $cache_age -lt $cache_duration
-            echo $__phpenv_version_cache
+            if test "$__phpenv_version_cache" != unavailable
+                echo $__phpenv_version_cache
+            end
             return
         end
     end
 
     if command -q curl
         set -l url https://raw.githubusercontent.com/shivammathur/setup-php/refs/heads/main
-        set -l version_data (curl -s "$url/src/configs/php-versions.json" 2>/dev/null)
-        if test -n "$version_data"
+        # Bounded because this runs from the PWD hook: curl has no total
+        # timeout and a 300s connect timeout by default, so a stalled network
+        # (captive portal, dead Wi-Fi) would freeze the prompt on cd.
+        set -l version_data (curl -fs --connect-timeout 2 --max-time 4 "$url/src/configs/php-versions.json" 2>/dev/null)
+        # Checked first, before anything resets $status: a timeout after a
+        # partial transfer leaves output, so only a zero exit means the JSON
+        # is complete.
+        if test $status -eq 0; and test -n "$version_data"
             set -g __phpenv_version_cache $version_data
-            set -g __phpenv_version_cache_time $current_time
             echo $version_data
+        else
+            set -g __phpenv_version_cache unavailable
         end
+        set -g __phpenv_version_cache_time $current_time
     end
 end
 
@@ -397,8 +409,7 @@ function __phpenv_provider_homebrew_list_available
     end
 
     set -l phpenv_versions
-    set -l phpenv_version_info (__phpenv_get_version_info)
-    set -l phpenv_latest_version (echo $phpenv_version_info | jq -r '.latest // "8.4"' 2>/dev/null)
+    set -l phpenv_latest_version (__phpenv_parse_version_field "latest" "8.4")
 
     for phpenv_formula in $phpenv_formulas
         set -l phpenv_clean_name (echo $phpenv_formula | sed 's|shivammathur/php/||')
