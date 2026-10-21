@@ -18,10 +18,12 @@ set -g test_failures 0
 set -l stub_dir (mktemp -d)
 set -gx STUB_CURL_LOG $stub_dir/calls
 set -gx STUB_CURL_MODE fail
-# Fails like a timed-out curl (exit 28, no output) unless told to succeed
+# Fails like a timed-out curl (exit 28, no output) unless told to succeed.
+# "partial" times out mid-body: output written, then exit 28.
 printf '%s\n' '#!/bin/sh' \
     'echo "$*" >>"$STUB_CURL_LOG"' \
     '[ "$STUB_CURL_MODE" = ok ] && echo "{\"8.x\": \"8.4\"}" && exit 0' \
+    '[ "$STUB_CURL_MODE" = partial ] && echo "{\"8.x\": \"8" && exit 28' \
     'exit 28' >$stub_dir/curl
 chmod +x $stub_dir/curl
 set -gx PATH $stub_dir $PATH
@@ -64,6 +66,13 @@ assert_eq (stub_calls) 2 "expired failure calls curl again"
 set out (__phpenv_get_version_info)
 assert_eq "$out" '{"8.x": "8.4"}' "cached success is returned"
 assert_eq (stub_calls) 2 "cached success does not refetch"
+
+# --- partial transfer ------------------------------------------------------
+set -gx STUB_CURL_MODE partial
+set -g __phpenv_version_cache_time (math (date +%s) - 301)
+set out (__phpenv_get_version_info)
+assert_eq "$out" "" "partial transfer prints nothing"
+assert_eq "$__phpenv_version_cache" unavailable "partial transfer is cached as a failure"
 
 rm -rf $stub_dir
 

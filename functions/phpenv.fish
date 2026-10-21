@@ -258,13 +258,16 @@ function __phpenv_get_version_info
         # timeout and a 300s connect timeout by default, so a stalled network
         # (captive portal, dead Wi-Fi) would freeze the prompt on cd.
         set -l version_data (curl -fs --connect-timeout 2 --max-time 4 "$url/src/configs/php-versions.json" 2>/dev/null)
-        set -g __phpenv_version_cache_time $current_time
-        if test -n "$version_data"
+        # Checked first, before anything resets $status: a timeout after a
+        # partial transfer leaves output, so only a zero exit means the JSON
+        # is complete.
+        if test $status -eq 0; and test -n "$version_data"
             set -g __phpenv_version_cache $version_data
             echo $version_data
         else
             set -g __phpenv_version_cache unavailable
         end
+        set -g __phpenv_version_cache_time $current_time
     end
 end
 
