@@ -409,8 +409,7 @@ function __phpenv_provider_homebrew_list_available
     end
 
     set -l phpenv_versions
-    set -l phpenv_version_info (__phpenv_get_version_info)
-    set -l phpenv_latest_version (echo $phpenv_version_info | jq -r '.latest // "8.4"' 2>/dev/null)
+    set -l phpenv_latest_version (__phpenv_parse_version_field "latest" "8.4")
 
     for phpenv_formula in $phpenv_formulas
         set -l phpenv_clean_name (echo $phpenv_formula | sed 's|shivammathur/php/||')

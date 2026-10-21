@@ -74,6 +74,14 @@ set out (__phpenv_get_version_info)
 assert_eq "$out" "" "partial transfer prints nothing"
 assert_eq "$__phpenv_version_cache" unavailable "partial transfer is cached as a failure"
 
+# --- homebrew listing during the failure window ----------------------------
+# jq runs no filter on empty input, so its own `//` default cannot apply.
+# Fakes a tap holding only the unversioned `php` formula, so no brew is needed.
+function __phpenv_get_tap_formulas
+    echo shivammathur/php/php
+end
+assert_eq (__phpenv_provider_homebrew_list_available) "8.4 (latest)" "cached failure lists latest with fallback"
+
 rm -rf $stub_dir
 
 # ---------------------------------------------------------------------------
