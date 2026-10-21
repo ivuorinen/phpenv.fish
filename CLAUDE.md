@@ -141,7 +141,8 @@ the current directory (composer.json included).
 
 #### Caching System
 
-- `__phpenv_version_cache`: 5-minute cache for API version data
+- `__phpenv_version_cache`: 5-minute cache for API version data; a failed fetch is cached as `unavailable`, and the fetch is
+  bounded (`--connect-timeout 2 --max-time 4`) because it runs from the PWD hook
 - `__phpenv_cellar_cache`: Permanent cache for Homebrew Cellar path
 - Reduces network calls and filesystem operations
 

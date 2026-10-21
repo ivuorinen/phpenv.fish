@@ -239,22 +239,31 @@ function __phpenv_get_version_info
     set -l current_time (date +%s)
     set -l cache_duration 300  # 5 minutes
 
-    # Return cached version if still valid
+    # Return cached version if still valid. A failed fetch is cached as the
+    # "unavailable" marker (never valid JSON), which prints nothing so callers
+    # take their fallback without refetching on every directory change.
     if test -n "$__phpenv_version_cache"
         set -l cache_age (math $current_time - $__phpenv_version_cache_time)
         if test $cache_age -lt $cache_duration
-            echo $__phpenv_version_cache
+            if test "$__phpenv_version_cache" != unavailable
+                echo $__phpenv_version_cache
+            end
             return
         end
     end
 
     if command -q curl
         set -l url https://raw.githubusercontent.com/shivammathur/setup-php/refs/heads/main
-        set -l version_data (curl -s "$url/src/configs/php-versions.json" 2>/dev/null)
+        # Bounded because this runs from the PWD hook: curl has no total
+        # timeout and a 300s connect timeout by default, so a stalled network
+        # (captive portal, dead Wi-Fi) would freeze the prompt on cd.
+        set -l version_data (curl -fs --connect-timeout 2 --max-time 4 "$url/src/configs/php-versions.json" 2>/dev/null)
+        set -g __phpenv_version_cache_time $current_time
         if test -n "$version_data"
             set -g __phpenv_version_cache $version_data
-            set -g __phpenv_version_cache_time $current_time
             echo $version_data
+        else
+            set -g __phpenv_version_cache unavailable
         end
     end
 end
